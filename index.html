@@ -201,7 +201,10 @@ async function plan(id){if(PLAN[id])return PLAN[id];const d=await load('plans/'+
     D[k]={path:ringsPath(rings),bb:[x0,y0,x1,y1],big};}
   PLAN[id]={...d,...relabel(d),D};return PLAN[id];}
 function yrsLabel(ys){ys=[...ys].sort((a,b)=>a-b);const out=[];let s=ys[0],p=ys[0];for(const y of ys.slice(1)){if(y===p+2){p=y;continue;}out.push(s===p?`${s}`:`${s}–${p}`);s=p=y;}out.push(s===p?`${s}`:`${s}–${p}`);return out.join(', ');}
-function relabel(p){const name=String(p.label).replace(/\s*\([^)]*\)\s*$/,'');const yrs=yrsLabel(p.years);return {yrs,name,label:`${yrs} (${name})`};}
+function dk(c){const pd=c.pd!=null?c.pd:(c.c&&!Array.isArray(c.c)?c.c.pd:null);return c.g==='courts'?String(pd||''):String(c.d);}
+function hasPlan(g,o){return g==='ushouse'||g==='leg'||(g==='courts'&&(o==='district'||o==='superior'));}
+function pidOf(g,o,y){if(g==='ushouse')return IDX.planyr.ushouse[y]||null;if(g==='leg'||(g==='courts'&&IDX.planyr[o]))return IDX.planyr[o][y]||null;return null;}
+function relabel(p){const name=String(p.label).replace(/\s*\([^)]*\)\s*$/,'');const yrs=p.years&&p.years.length?yrsLabel(p.years):'Proposed';return {yrs,name,label:`${yrs} (${name})`};}
 const XW={};async function xw(set){if(set==='2026')return null;if(!XW[set])XW[set]=await load('xw/x'+set+'.json');return XW[set];}
 // ---------- catalog / picker ----------
 let CAT=[];
@@ -283,7 +286,7 @@ function hatch(color){if(patCache[color])return patCache[color];const c=document
 const SHOW={num:true,dl:true,cl:true};
 function syncToggles(){syncOvl();{const lv=document.getElementById('tg-lvl');const lok=(MODE==='map'&&!(LAYERS&&LAYERS.noCounty))||MODE==='cmp';lv.disabled=!lok;document.getElementById('lb-lv').classList.toggle('off',!lok);}{const sh=document.getElementById('tg-shade');sh.disabled=MODE==='cmp';document.getElementById('lb-sh').classList.toggle('off',MODE==='cmp');}const L=LAYERS||{};const hasD=!!(L.dlines&&L.dlines.length),hasN=!!(L.labels&&L.labels.length);
   for(const [id,ok] of [['num',hasN],['dl',hasD]]){const i=document.getElementById('tg-'+id);i.disabled=!ok;document.getElementById('lb-'+id).classList.toggle('off',!ok);}}
-function fillOvl(){const ch={congress:'Congress',senate:'State Senate',house:'State House'};const s=document.getElementById('o-ovl');s.innerHTML='';
+function fillOvl(){const ch={congress:'Congress',senate:'State Senate',house:'State House',district:'District Court',superior:'Superior Court'};const s=document.getElementById('o-ovl');s.innerHTML='';
   const ops=[['auto','The election’s own'],['none','None']].concat(IDX.plans.slice().sort((a,b)=>a.chamber.localeCompare(b.chamber)||b.id.localeCompare(a.id)).map(p=>[p.id,`${ch[p.chamber]} ${p.yrs} (${p.name})`]));
   for(const [v,l] of ops)s.appendChild(el('option',{value:v,text:l}));s.value=OPT.ovl;}
 document.getElementById('o-ovl').addEventListener('change',e=>{OPT.ovl=e.target.value;refresh();});
@@ -292,7 +295,7 @@ document.getElementById('o-ccrop').addEventListener('change',e=>{OPT.ccrop=e.tar
 function syncCCrop(){const s=document.getElementById('o-ccrop');if(!s.dataset.ok&&COUNTY){for(const c of Object.keys(COUNTY).sort())s.appendChild(el('option',{value:c,text:titleCase(c)+' County'}));s.dataset.ok='1';}s.value=OPT.ccrop;}
 function cropAllowed(){if(MODE!=='map'||!PA||!PA.sel)return false;const s=PA.s;return !((s.g==='ushouse'||s.g==='leg'));}
 async function syncCrop(){const s=document.getElementById('o-crop');const ov=resolvePlan();const ok=cropAllowed()&&!!ov;
-  let ids=[];if(ok){const OP=await plan(ov);ids=Object.keys(OP.D).sort((a,b)=>+a-+b);s.dataset.plan=ov;}
+  let ids=[];if(ok){const OP=await plan(ov);ids=Object.keys(OP.D).sort(natCmp);s.dataset.plan=ov;}
   const key=(ok?ov:'')+'|'+ids.length;if(s.dataset.key!==key){s.innerHTML='';s.appendChild(el('option',{value:'',text:'Whole map'}));for(const d of ids)s.appendChild(el('option',{value:d,text:'District '+d}));s.dataset.key=key;}
   if(!ids.includes(OPT.crop))OPT.crop='';s.value=OPT.crop;s.disabled=!ok;document.getElementById('lb-crop').classList.toggle('off',!ok);}
 document.getElementById('tg-lvl').addEventListener('change',e=>{LVL=e.target.value;refresh();});
@@ -431,7 +434,7 @@ function nearestFill(G,want,haveKeys,colorOf,setIdx,restrictCty){
 function legendBlock(title,items){const d=el('div',{class:'lg'});d.appendChild(el('h3',{text:title}));for(const [c,l,h] of items){const s=el('div',{class:'sw'});const i=el('i');i.dataset.c=c||'';if(h)i.dataset.h=h;if(h){i.style.background=`repeating-linear-gradient(135deg,${h} 0 2px,#fff 2px 5px)`;}else i.style.background=c;s.appendChild(i);s.appendChild(el('span',{text:l}));d.appendChild(s);}return d;}
 function setHead(t,s){if(SHADE==='margin'&&MODE!=='cmp'&&s)s=s.replace(/its share of registered voters/,'its lead over the next-largest group').replace(/winner’s share of the vote/g,'winner’s margin over the runner-up').replace(/leader’s share of the vote/g,'leader’s margin over the runner-up').replace(/leader’s share/g,'leader’s margin');document.getElementById('title').textContent=t;document.getElementById('subtitle').textContent=s||'';}
 function setNote(t){document.getElementById('note').textContent=t;}
-function planFor(sel){const ch=sel.e?null:null;const g=sel.g;const y=sel.year;if(g==='ushouse')return IDX.planyr.ushouse[y]||null;if(g==='leg')return IDX.planyr[sel.o][y]||null;return null;}
+function planFor(sel){return pidOf(sel.g,sel.o,sel.year);}
 const LINES_NOTE=sets=>sets[0]==='cty'?'Shown by county':sets[0]==='2006'?'Drawn on the 2006 precinct lines, with 2012 lines for precincts created later':'Drawn on the '+(sets[0]==='2018'?'2017':sets[0])+' precinct lines';
 const NOTE2000=' Guilford, Forsyth, Mecklenburg and Wake 2000 precinct numbers do not match the precinct maps, so results there are estimated: each county’s votes (each district’s, for district races) are spread over its precincts by 2004 presidential turnout and partisanship.';
 function poolNote(e){const nr=' Precinct shapes with no results are colored like the nearest precinct in the same county; they add no votes.';
@@ -445,7 +448,7 @@ async function drawElection(){
   const P=PA,sx=P.sel,s=P.s;setStatus('Loading…');
   const contests=await getContests(sx);const e=sx.e;const sets=e.sets;const Gs=await Promise.all(sets.map(geo));
   const isGen=genLike(e,contests[0],!!sx.one);const REG=e.kind==='registration';const all=!!sx.all;
-  const pid=(s.g==='ushouse'||s.g==='leg')?(s.g==='ushouse'?IDX.planyr.ushouse[e.year]:IDX.planyr[s.o][e.year]):null;
+  const pid=pidOf(s.g,s.o,e.year);
   const PL=pid?await plan(pid):null;
   // values per shape key
   const fills=[],hits=[];const usedL=new Map();const addUse=(k,lab,c,h)=>{if(!usedL.has(k))usedL.set(k,[c,lab,h]);};
@@ -501,11 +504,11 @@ async function drawElection(){
   fills.sort((a,b)=>0);
   let clip=null,dlines=[],bb=null,mask=null;
   const one=contests.length===1&&!all?contests[0]:null;
-  if(PL){if(one&&(s.g==='ushouse'||s.g==='leg')){const D=PL.D[String(one.d)];if(D){clip=D.path;dlines=[D.path];bb=D.bb;}}else{dlines=Object.values(PL.D).map(x=>x.path);}}
+  if(PL){if(one&&hasPlan(s.g,s.o)){const D=PL.D[dk(one)];if(D){clip=D.path;dlines=[D.path];bb=D.bb;}}else{dlines=Object.values(PL.D).map(x=>x.path);}}
   if(!bb){let x0=1e12,y0=1e12,x1=-1e12,y1=-1e12;for(const k of have){const b=Gs[Math.floor(k/K)].bb[k%K];x0=Math.min(x0,b[0]);y0=Math.min(y0,b[1]);x1=Math.max(x1,b[2]);y1=Math.max(y1,b[3]);}bb=[x0,y0,x1,y1];
     if(!one||!(s.g==='ushouse'||s.g==='leg'||(SUBG(s.g)&&one.o!=='supreme'&&one.o!=='coa')))bb=STATEBB;}
   let cityLine=null;if(one&&one.o==='mayor'){const C=await cityShape(one.d);if(C){clip=C.path;bb=C.bb;cityLine=C.path;}}   // mayoral races: cropped to the city limits
-  let labels=PL?distLabels(PL,one?[String(one.d)]:Object.keys(PL.D)):[];
+  let labels=PL?distLabels(PL,one?[dk(one)]:Object.keys(PL.D)):[];
   {const ov=resolvePlan();if(ov===null){dlines=[];labels=[];}else if(ov!==pid){const OP=await plan(ov);dlines=Object.values(OP.D).map(x=>x.path);labels=distLabels(OP,Object.keys(OP.D));}}
   // ---- crop a statewide race to one district of the chosen lines
   let CROP=null;
@@ -565,7 +568,7 @@ async function drawElection(){
     renderResults(all?L.map(x=>x._full):[L[0]],isGen,all,s);const box=document.getElementById('results');
     if(!all){const T=L[0].t.reduce((a,b)=>a+b,0),ST=contests[0].t.reduce((a,b)=>a+b,0);box.insertBefore(el('div',{class:'muted',style:'font-size:.76rem;margin-bottom:6px',text:`In ${titleCase(CC)} County's precincts: ${fmt(T)} of ${fmt(ST)} votes.`}),box.firstChild);}
     document.getElementById('res-h').textContent=all?'Races in county (full results)':'Results in county';setStatus('');return;}
-  if(CROP){const chn={house:'State House',senate:'State Senate',congress:'Congressional'}[CROP.OP.chamber];
+  if(CROP){const chn={house:'State House',senate:'State Senate',congress:'Congressional',district:'District Court',superior:'Superior Court'}[CROP.OP.chamber];
     const t=document.getElementById('title');t.textContent+=` — ${chn} District ${CROP.d}`;
     document.getElementById('subtitle').textContent+=` Cropped to ${chn} District ${CROP.d} (${CROP.OP.yrs} lines).`;
     document.getElementById('note').textContent+=' District totals: results are spread onto 2020 census blocks by voting-age population and re-added within the district, so precincts split by the district line count only their part inside it.';
@@ -650,10 +653,10 @@ async function drawCompare(){
       return `<b>${titleCase(G.name[i]||G.code[i])}</b><div class="muted">${titleCase(G.cty[i])} County</div><table><tr><td>${esc(nA)}</td><td class="n">${fa}</td></tr><tr><td>${esc(nB)}</td><td class="n">${fb}</td></tr><tr><td>${trend?'Change vs. overall':'Change'}</td><td class="n"><b>${(v.d>=0?'+':'')+v.d.toFixed(1)}</b></td></tr></table>`;}});}
   // clip to a single district of B if any
   let clip=null,dlines=[],bb=STATEBB;
-  const one=B.one&&(PB.s.g==='ushouse'||PB.s.g==='leg')?B.one:(A.one&&(PA.s.g==='ushouse'||PA.s.g==='leg')?A.one:null);
-  if(one){const P=one===B.one?PB:PA;const pid=P.s.g==='ushouse'?IDX.planyr.ushouse[P.sel.e.year]:IDX.planyr[P.s.o][P.sel.e.year];if(pid){const PL=await plan(pid);const D=PL.D[String(one.d)];if(D){clip=D.path;dlines=[D.path];bb=D.bb;}}
+  const one=B.one&&hasPlan(PB.s.g,PB.s.o)?B.one:(A.one&&hasPlan(PA.s.g,PA.s.o)?A.one:null);
+  if(one){const P=one===B.one?PB:PA;const pid=pidOf(P.s.g,P.s.o,P.sel.e.year);if(pid){const PL=await plan(pid);const D=PL.D[dk(one)];if(D){clip=D.path;dlines=[D.path];bb=D.bb;}}
     if(bb===STATEBB){let x0=1e12,y0=1e12,x1=-1e12,y1=-1e12;for(const k of keys){const b=Gs[Math.floor(k/K)].bb[k%K];x0=Math.min(x0,b[0]);y0=Math.min(y0,b[1]);x1=Math.max(x1,b[2]);y1=Math.max(y1,b[3]);}bb=[x0,y0,x1,y1];}}
-  let labels=[];{const ov=resolvePlan();const own=ownPlanOf(PB);if(ov===null){dlines=[];}else if(!(one&&ov===own)){const OP=await plan(ov);dlines=Object.values(OP.D).map(x=>x.path);labels=distLabels(OP,Object.keys(OP.D));}else{const OP=await plan(ov);labels=distLabels(OP,[String(one.d)]);}}
+  let labels=[];{const ov=resolvePlan();const own=ownPlanOf(PB);if(ov===null){dlines=[];}else if(!(one&&ov===own)){const OP=await plan(ov);dlines=Object.values(OP.D).map(x=>x.path);labels=distLabels(OP,Object.keys(OP.D));}else{const OP=await plan(ov);labels=OP.D[dk(one)]?distLabels(OP,[dk(one)]):[];}}
   // ---- counties
   const CA={};for(const k of keys){const cy=Gs[Math.floor(k/K)].cty[k%K];const o=CA[cy]||(CA[cy]={a:{D:0,R:0,X:0,T:0},b:{D:0,R:0,X:0,T:0}});const a=MA.get(k),b=MB.get(k);for(const f in a)o.a[f]+=a[f];for(const f in b)o.b[f]+=b[f];}
   const crow=Object.keys(CA).sort().map(cy=>{const o=CA[cy];let d=val(o.b)-val(o.a);if(trend)d-=dO;return {cy,va:val(o.a),vb:val(o.b),d};});
@@ -696,7 +699,7 @@ async function drawDistricts(){
   const M=new Map();
   if(isGen){for(const [k,a] of shapeParty(contests))M.set(k,{D:a.D,R:a.R,O:a.O});}else{const c=contests[0],n=c.c.length;for(let i=0;i<c.s.length;i++){const o={};for(let j=0;j<n;j++)o[j]=c.v[i*n+j];M.set(c.s[i],o);}}
   // a district race shown on its own lines: each district gets its own race's official totals (no geographic re-tally)
-  const exact=A.e.kind!=='registration'&&contests.every(c=>c.d!=null&&c.d!=='')&&LASTPLAN&&LASTPLAN===ownPlanOf(PA);
+  const exact=A.e.kind!=='registration'&&(PA.s.g==='ushouse'||PA.s.g==='leg')&&contests.every(c=>c.d!=null&&c.d!=='')&&LASTPLAN&&LASTPLAN===ownPlanOf(PA);
   const DV={};
   if(exact){for(const c of contests){let o=DV[c.d];if(!o){o={};groups.forEach(g=>o[g]=0);DV[c.d]=o;}const pk=c.cp.map(partyKey);c.t.forEach((v,j)=>{o[isGen?pk[j]:j]+=v;});}}
   else{const M26=await to2026({sets:A.e.sets,M});for(const [j,v] of M26){const as=PL.a26[j];if(!as)continue;for(const [d,w] of as){let o=DV[d];if(!o){o={};groups.forEach(g=>o[g]=0);DV[d]=o;}for(const g of groups)o[g]+=(v[g]||0)*w;}}}
@@ -713,7 +716,7 @@ async function drawDistricts(){
   const lg=document.getElementById('legend');lg.innerHTML='';
   for(const g of groups){const it=[];for(let b=7;b>=0;b--)if(used.has(colOf(g)+'|'+b+'|'+g))it.push([RAMP8[colOf(g)][b],LABS()[b]]);if(it.length)lg.appendChild(legendBlock(name(g)+' ahead',it));}
   if(Object.keys(PL.D).some(d=>!DV[d]))lg.appendChild(legendBlock('Other',[[NODATA,'No votes from this election']]));
-  const nA=labelOf(PA);setHead(`${nA} on the ${PL.yrs} ${({house:'state house',senate:'state senate',congress:'congressional'})[PL.chamber]} districts`,(A.e.kind==='registration'?'Largest group in each district, shaded by its share of registered voters.':'District winner, shaded by the winner’s share of the vote.'));
+  const nA=labelOf(PA);setHead(`${nA} on the ${PL.yrs} ${({house:'state house',senate:'state senate',congress:'congressional',district:'district court',superior:'superior court'})[PL.chamber]} districts`,(A.e.kind==='registration'?'Largest group in each district, shaded by its share of registered voters.':'District winner, shaded by the winner’s share of the vote.'));
   setNote(exact?`Each district shows its own race's official totals, including votes that could not be placed in a precinct. Districts are cropped to the county shoreline.`:`Precinct results are spread onto 2020 census blocks by voting-age population and re-added into each district (via the 2026 precinct lines); each block goes to the district containing its interior point. Districts are cropped to the county shoreline. `+(A.e.kind==='registration'?'Registered voters, active and inactive, on '+A.e.date+'.':POOL_NOTE.split('. ')[0]+'.'));
   const box=document.getElementById('results');box.innerHTML='';document.getElementById('res-h').textContent='Districts';
   const sm=el('div',{class:'row',style:'gap:14px;margin-bottom:8px'});for(const g of groups)if(seats[g])sm.appendChild(el('span',{html:`<span class="dot" style="background:${PCOL[colOf(g)]}"></span><b>${seats[g]}</b> ${esc(name(g))}`}));box.appendChild(sm);
@@ -728,7 +731,7 @@ function poleish(r){ // a point well inside the ring: grid search for the cell f
   for(let i=1;i<N;i++)for(let j=1;j<N;j++){const x=x0+(x1-x0)*i/N,y=y0+(y1-y0)*j/N;if(!oc.isPointInPath(p,x,y))continue;let m=1e30;for(let k=0;k<r.length;k+=Math.max(1,Math.floor(r.length/600))){const dd=(r[k][0]-x)**2+(r[k][1]-y)**2;if(dd<m)m=dd;}if(m>bd){bd=m;best=[x,y];}}
   return best;}
 function renderPlanOpts(){const box=document.getElementById('opts');box.innerHTML='';document.getElementById('cardOpt').classList.remove('hide');document.getElementById('opt-h').textContent='District lines';
-  const ch={congress:'Congress',senate:'State Senate',house:'State House'};const ops=IDX.plans.slice().sort((a,b)=>a.chamber.localeCompare(b.chamber)||b.id.localeCompare(a.id)).map(p=>[p.id,`${ch[p.chamber]} ${p.yrs} (${p.name})`]);
+  const ch={congress:'Congress',senate:'State Senate',house:'State House',district:'District Court',superior:'Superior Court'};const ops=IDX.plans.slice().sort((a,b)=>a.chamber.localeCompare(b.chamber)||b.id.localeCompare(a.id)).map(p=>[p.id,`${ch[p.chamber]} ${p.yrs} (${p.name})`]);
   const s=sel('o-plan',ops,OPT.plan);box.appendChild(el('label',{for:'o-plan',text:'Plan'}));box.appendChild(s);s.onchange=()=>{OPT.plan=s.value;refresh();};
   box.appendChild(el('div',{class:'muted',style:'grid-column:1/-1;font-size:.74rem',text:'Any election can be re-tallied on any plan. A district race only covers its own district, so other districts show no votes.'}));}
 // ---------- modes ----------
@@ -740,8 +743,8 @@ async function run1(){try{LASTPLAN=resolvePlan();await syncCrop();syncCCrop();
   if(MODE==='map'){document.getElementById('cardOpt').classList.add('hide');await drawElection();}
   else if(MODE==='cmp')await drawCompare();else await drawDistricts();
   if(MODE!=='map'&&OPT.ccrop&&LAYERS&&COUNTY[OPT.ccrop]){LAYERS.clip2=COUNTY[OPT.ccrop];fit(COUNTYBB[OPT.ccrop],0.05);draw();document.getElementById('title').textContent+=` — ${titleCase(OPT.ccrop)} County`;}}catch(err){console.error(err);setStatus(err.message||String(err),true);}}
-function ownPlanOf(P){const s=P.s,y=P.sel&&P.sel.e?P.sel.e.year:+s.year;return s.g==='ushouse'?IDX.planyr.ushouse[y]||null:s.g==='leg'?IDX.planyr[s.o][y]||null:null;}
-function ownPlan(){if(PA.s.g==='ushouse'||PA.s.g==='leg'){OPT.ovl='auto';syncOvl();}}
+function ownPlanOf(P){const s=P.s,y=P.sel&&P.sel.e?P.sel.e.year:+s.year;return pidOf(s.g,s.o,y);}
+function ownPlan(){if(hasPlan(PA.s.g,PA.s.o)){OPT.ovl='auto';syncOvl();}}
 let LASTPLAN=null; // the plan whose lines are on screen now
 function resolvePlan(){const o=OPT.ovl;if(o!=='auto'&&o!=='none')return o;if(o==='none'&&MODE!=='dist')return null;const own=ownPlanOf(MODE==='cmp'?PB:PA);return own||(MODE==='dist'?'C2026':null);}
 function syncOvl(){const s=document.getElementById('o-ovl');if(s.value!==OPT.ovl)s.value=OPT.ovl;[...s.options].forEach(o=>{if(o.value==='none')o.disabled=MODE==='dist';});if(MODE==='dist'&&OPT.ovl==='none'){OPT.ovl='auto';s.value='auto';}}
