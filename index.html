@@ -1,0 +1,776 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>*,*::before,*::after{box-sizing:border-box}body{margin:0}</style>
+</head>
+<body>
+<title>NC Election Atlas</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap">
+<style>
+/* Layout: control rail (pickers + results) beside a large "map sheet" that stays paper-white in both themes */
+:root{
+  --bg:#f3f4f1; --panel:#ffffff; --ink:#1d2421; --muted:#5d6762; --line:#d9ddd6; --accent:#2f5d8a; --accent-ink:#ffffff;
+  --sheet:#ffffff; --sheet-line:#cfd3cc; --chip:#e8ebe5; --warn:#8a5a00;
+  --f-display:"Libre Franklin","Franklin Gothic Medium","Arial Narrow",Arial,sans-serif;
+  --f-body:Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#171b19;--panel:#20262300;--panel:#212724;--ink:#e6eae6;--muted:#9aa49e;--line:#343c38;--accent:#7fb0e0;--accent-ink:#0d1a26;--sheet:#fbfbf9;--sheet-line:#3a423e;--chip:#2b322f;--warn:#e0b25a;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#171b19;--panel:#212724;--ink:#e6eae6;--muted:#9aa49e;--line:#343c38;--accent:#7fb0e0;--accent-ink:#0d1a26;--sheet:#fbfbf9;--sheet-line:#3a423e;--chip:#2b322f;--warn:#e0b25a;color-scheme:dark}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:14px;line-height:1.45;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:12px}
+h1{font-family:var(--f-display);font-weight:800;font-size:1.5rem;letter-spacing:-.01em;margin:0}
+.top{display:flex;flex-wrap:wrap;align-items:center;gap:12px 24px;margin-bottom:12px}
+.top .sub{color:var(--muted);font-size:.85rem}
+.tabs{display:flex;gap:4px;background:var(--chip);padding:4px;border-radius:8px;margin-left:auto}
+.tabs button{font:600 .85rem var(--f-body);border:0;background:transparent;color:var(--ink);padding:7px 14px;border-radius:6px;cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--panel);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.tabs button:focus-visible,select:focus-visible,.btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.wrap{display:grid;grid-template-columns:360px minmax(0,1fr);gap:14px;align-items:start}
+@media (max-width:900px){.wrap{grid-template-columns:minmax(0,1fr)}.sheet{order:-1}}
+.rail{display:flex;flex-direction:column;gap:12px;min-width:0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px;min-width:0}
+.card h2{font:700 .78rem var(--f-display);text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin:0 0 8px}
+.pick{display:grid;grid-template-columns:84px minmax(0,1fr);gap:6px 8px;align-items:center}
+.pick label{font-size:.8rem;color:var(--muted)}
+select{width:100%;font:500 .86rem var(--f-body);color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:6px 8px;min-width:0}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.btn{font:600 .8rem var(--f-body);border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:6px;padding:5px 10px;cursor:pointer}
+.sheet{background:var(--sheet);border:1px solid var(--sheet-line);border-radius:10px;position:relative;min-width:0;overflow:hidden;color:#1d2421}
+.sheet .head{padding:14px 18px 6px;position:relative}
+.osmattr{position:absolute;right:6px;bottom:4px;font-size:.66rem;background:rgba(255,255,255,.8);padding:1px 5px;border-radius:3px;color:#333}.osmattr a{color:#333}.osmattr.hide{display:none}
+.exp{position:absolute;right:14px;top:12px;display:flex;gap:6px}.exp button{font:600 .72rem var(--f-body,inherit);padding:5px 9px;border:1px solid #c9c6bb;border-radius:6px;background:#fff;color:#1d2421;cursor:pointer}.exp button:hover{background:#f2f1ec}.exp button:disabled{opacity:.5;cursor:default}
+.sheet .head .title,.sheet .head .subtitle{padding-right:170px}
+@media (max-width:640px){.exp{position:static;margin-top:8px}.sheet .head .title,.sheet .head .subtitle{padding-right:0}}
+.sheet .title{font:700 1.2rem/1.25 var(--f-display);text-wrap:balance;margin:0;color:#1d2421}
+.sheet .subtitle{color:#5d6762;font-size:.83rem;margin-top:3px}
+.toggles{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:10px;font-size:.82rem;color:var(--ink)}
+.pick label.off{opacity:.45}
+.toggles label{display:flex;align-items:center;gap:5px;cursor:pointer}
+.toggles label.off{opacity:.45;cursor:default}
+.toggles input{accent-color:#2f5d8a;margin:0}
+.mapbox{position:relative;aspect-ratio:2.05/1;max-height:74vh;min-height:320px;width:100%;touch-action:none}
+canvas#map{width:100%;height:100%;display:block;cursor:grab}
+canvas#map.drag{cursor:grabbing}
+.zoom{position:absolute;right:10px;top:10px;display:flex;flex-direction:column;gap:4px}
+.zoom button{width:30px;height:30px;border:1px solid #cfd3cc;background:#fff;color:#1d2421;border-radius:6px;font:700 15px var(--f-body);cursor:pointer}
+.legend{display:flex;flex-wrap:wrap;gap:14px 26px;padding:6px 18px 14px;color:#1d2421;font-size:.78rem}
+.lg h3{font:700 .72rem var(--f-display);text-transform:uppercase;letter-spacing:.06em;margin:0 0 4px;color:#3b4440}
+.lg .sw{display:flex;align-items:center;gap:6px;margin:2px 0;white-space:nowrap}
+.lg i{display:inline-block;width:16px;height:12px;border:1px solid rgba(0,0,0,.25)}
+.note{color:#5d6762;font-size:.74rem;padding:0 18px 14px;max-width:110ch}
+.tip{position:absolute;pointer-events:none;background:#fff;color:#1d2421;border:1px solid #cfd3cc;border-radius:8px;padding:8px 10px;font-size:.78rem;box-shadow:0 4px 14px rgba(0,0,0,.14);max-width:290px;z-index:5}
+.tip b{font-weight:600}
+.tip table,.tip td{color:#1d2421}
+.tip .muted{color:#5d6762}
+.tip table{border-collapse:collapse;margin-top:4px;width:100%}
+.tip td{padding:1px 0;font-variant-numeric:tabular-nums}
+.tip td.n{text-align:right;padding-left:10px}
+table.res{width:100%;border-collapse:collapse;font-size:.82rem}
+table.res td,table.res th{padding:4px 2px;border-bottom:1px solid var(--line);text-align:left;font-variant-numeric:tabular-nums}
+table.res th{font-weight:600;color:var(--muted);font-size:.74rem}
+table.res td.n,table.res th.n{text-align:right}
+.dot{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+.scroll{max-height:340px;overflow:auto}
+.muted{color:var(--muted)}
+.status{font-size:.78rem;color:var(--muted);min-height:1.2em}
+.warn{color:var(--warn)}
+.big{font:700 1.05rem var(--f-display)}
+.hide{display:none!important}
+</style>
+
+<div class="top">
+  <div><h1>NC Election Atlas</h1><div class="sub">North Carolina precinct results, 2000–2026 · generals, primaries and runoffs</div></div>
+  <div class="tabs" role="tablist">
+    <button role="tab" id="t-map" aria-selected="true">Election map</button>
+    <button role="tab" id="t-cmp" aria-selected="false">Compare</button>
+    <button role="tab" id="t-dist" aria-selected="false">On district lines</button>
+  </div>
+</div>
+<div class="wrap">
+  <div class="rail">
+    <div class="card" id="cardA"><h2 id="cardA-h">Election</h2><div id="pickA"></div></div>
+    <div class="card hide" id="cardB"><h2>To (later election)</h2><div id="pickB"></div></div>
+    <div class="card" id="cardDisp"><h2>Map display</h2><div class="pick">
+      <label for="o-ovl" id="lb-ovl">District lines</label><select id="o-ovl"></select>
+      <label for="o-crop" id="lb-crop">Crop to district</label><select id="o-crop"><option value="">Whole map</option></select>
+      <label for="o-ccrop" id="lb-ccrop">Crop to county</label><select id="o-ccrop"><option value="">Whole map</option></select>
+      <label for="tg-lvl" id="lb-lv">Show</label><select id="tg-lvl"><option value="precinct">Precincts</option><option value="county">Counties</option></select>
+      <label for="tg-shade" id="lb-sh">Shade by</label><select id="tg-shade"><option value="share">Vote share</option><option value="margin">Margin</option></select></div>
+      <div class="toggles"><label id="lb-num"><input type="checkbox" id="tg-num" checked>District numbers</label><label id="lb-dl"><input type="checkbox" id="tg-dl" checked>District lines</label><label id="lb-cl"><input type="checkbox" id="tg-cl" checked>County lines</label><label id="lb-comb" title="In single-seat races with two or more candidates from one party, add their votes together"><input type="checkbox" id="tg-comb">Combine same-party candidates</label><label id="lb-osm" title="Show OpenStreetMap under the results, with the results made partly see-through"><input type="checkbox" id="tg-osm">OpenStreetMap basemap</label></div></div>
+    <div class="card hide" id="cardOpt"><h2 id="opt-h">Options</h2><div class="pick" id="opts"></div></div>
+    <div class="card"><h2 id="res-h">Results</h2><div id="results" class="scroll"></div></div>
+    <div class="card hide" id="cardCty"><h2>By county</h2><div id="ctyres" class="scroll"></div></div>
+    <div class="status" id="status"></div>
+  </div>
+  <div class="sheet">
+    <div class="head"><div class="exp"><button id="exp-png" title="Save the map with its title and legend as a PNG image">Export PNG</button><button id="exp-svg" title="Save the map with its title and legend as an SVG vector file">Export SVG</button></div><p class="title" id="title">Loading…</p><div class="subtitle" id="subtitle"></div>
+      </div>
+    <div class="mapbox" id="mapbox"><canvas id="map"></canvas>
+      <div class="zoom"><button id="zin" aria-label="Zoom in">+</button><button id="zout" aria-label="Zoom out">−</button><button id="zfit" aria-label="Fit map">⤢</button></div>
+      <div class="tip hide" id="tip"></div><div class="osmattr hide" id="osmattr">© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors</div></div>
+    <div class="legend" id="legend"></div>
+    <div class="note" id="note"></div>
+  </div>
+</div>
+
+<script>
+"use strict";
+// ---------- palettes (house style) ----------
+const RAMP8={
+ B:['#eef3fd','#dee8fb','#b4c7ec','#8da9e2','#678cd7','#416fcd','#3357a2','#244079'],
+ R:['#fdeeee','#fbdedd','#f1b5b2','#ed8883','#e55751','#d02823','#b00000','#850400'],
+ Y:['#fbf6dc','#f5edc0','#e6d78f','#d0bd5d','#c0a32f','#a88600','#907300','#6e5800'],
+ G:['#eef7ef','#ddeedf','#c5e3c9','#93cf9d','#5db873','#2e9a53','#17783a','#0b5226'],
+ P:['#f3eff8','#e7e0f1','#d9cfe8','#b9a5d6','#9477c0','#7048a6','#522a88','#391a63'],
+ O:['#fdf3e8','#fae6d0','#f5d0a9','#f0b072','#e68a2e','#c46d12','#9a520a','#703b05'],
+ T:['#ecfafa','#daf5f5','#bfe3e0','#8fd0cb','#52b4ad','#2a928b','#16706a','#0b4e49'],
+ K:['#fbeef4','#f7dde9','#f0bfd5','#e693b8','#db6799','#c2427a','#9c2d5f','#741e45'],
+ N:['#f5f0eb','#ebe1d7','#dccab8','#c6a98d','#ab8462','#8a5a3a','#6e452b','#52321e'],
+ L:['#f4f8e9','#e8f1d3','#d4e5a9','#bcd57b','#a1c24f','#8bb02e','#6e8c22','#516718'],
+ S:['#f1f3f6','#e2e7ec','#c9d1da','#a8b4c1','#8695a6','#64788c','#4d5e6f','#384552'],
+ X:['#f4f4f4','#e8e8e8','#d6d6d6','#b0b0b0','#8a8a8a','#666666','#484848','#2e2e2e']};
+const LAB8=['Under 30%','30–40%','40–50%','50–60%','60–70%','70–80%','80–90%','90%+'];
+const PCOL={B:'#416fcd',R:'#d02823',Y:'#a88600',G:'#2e9a53',P:'#7048a6',O:'#c46d12',T:'#2a928b',K:'#c2427a',N:'#8a5a3a',L:'#8bb02e',S:'#64788c',X:'#666666'};
+const TIE='#f6c9df', NODATA='#e4e2da', NOTE_GRAY='#c8c6bc';
+const DIV={ // comparison ramps, index 0 = smallest change
+ BR:{pos:['#b4c7ec','#8da9e2','#678cd7','#416fcd','#3357a2','#244079'],neg:['#f1b5b2','#ed8883','#e55751','#d02823','#b00000','#850400'],posL:'Toward Democrats',negL:'Toward Republicans'},
+ PG:{pos:['#d9cdea','#b9a3d6','#9a7bc3','#7a52ae','#5a3590','#3d2268'],neg:['#cfe5cc','#a6d1a1','#78b872','#4a9a46','#2d7a2b','#175a17']},
+ TO:{pos:['#bfe3e0','#8fd0cb','#52b4ad','#2a928b','#16706a','#0b4e49'],neg:['#f5d0a9','#f0b072','#e68a2e','#c46d12','#9a520a','#703b05']}};
+const PARTYNAME={DEM:'Democratic',REP:'Republican',LIB:'Libertarian',GRE:'Green',CST:'Constitution',UNA:'Unaffiliated',REF:'Reform',NLP:'Natural Law',JUS:'Justice',WTP:"We the People",'':'Other'};
+const GROUPS=[['president','President'],['us_senate','U.S. Senate'],['ushouse','U.S. House'],['cos','Council of State'],['leg','State Legislature'],['courts','Courts'],['local','Local races'],['reg','Voter registration']];
+const LOCALTYPES=[['sheriff','Sheriff'],['clerk','Clerk of Superior Court'],['cc','County commission'],['mayor','Mayor (cities over 25,000)']];
+const COURTS=[['supreme','Supreme Court'],['coa','Court of Appeals'],['superior','Superior Court'],['district','District Court']];
+const COS=[['governor','Governor'],['lt_governor','Lieutenant Governor'],['attorney_general','Attorney General'],['secretary_of_state','Secretary of State'],['auditor','Auditor'],['treasurer','Treasurer'],['superintendent','Superintendent of Public Instruction'],['ag','Commissioner of Agriculture'],['insurance','Commissioner of Insurance'],['labor','Commissioner of Labor']];
+const OFFN={reg:'Voter registration',president:'President',us_senate:'U.S. Senate',ushouse:'U.S. House',house:'State House',senate:'State Senate',supreme:'Supreme Court',coa:'Court of Appeals',superior:'Superior Court',district:'District Court',sheriff:'Sheriff',clerk:'Clerk of Superior Court',cc:'County Commission',mayor:'Mayor'};COS.forEach(([k,v])=>OFFN[k]=v);
+const KINDN={general:'General election',primary:'primary',runoff:'primary runoff',special:'special primary',municipal:'municipal election'};
+const SUBG=g=>g==='courts'||g==='local';
+const K=100000;
+// ---------- data loading ----------
+const cache={};
+function load(path){if(!cache[path])cache[path]=fetch('data/'+path).then(r=>{if(!r.ok)throw new Error('Could not load '+path);return r.json()});return cache[path];}
+let IDX=null,COUNTY=null;const COUNTYBB={};let LVL='precinct';
+const GEO={};      // set -> {paths, bbox, cen, cty, code, name}
+async function geo(set){
+  if(GEO[set])return GEO[set];
+  const g=await load('geo/p'+set+'.json');const q=g.q;const paths=[],bb=[];
+  for(const sh of g.shapes){const p=new Path2D();p._enc=sh;p._q=q;let x0=1e12,y0=1e12,x1=-1e12,y1=-1e12;
+    for(const r of sh){let x=0,y=0;for(let i=0;i<r.length;i+=2){x+=r[i];y+=r[i+1];const X=x*q,Y=y*q;if(i===0)p.moveTo(X,Y);else p.lineTo(X,Y);if(X<x0)x0=X;if(X>x1)x1=X;if(Y<y0)y0=Y;if(Y>y1)y1=Y;}p.closePath();}
+    paths.push(p);bb.push([x0,y0,x1,y1]);}
+  GEO[set]={paths,bb,cen:g.cen.map(c=>[c[0]*q,c[1]*q]),cty:g.cty,code:g.code,name:g.name};return GEO[set];
+}
+function decodeRings(enc,q){const out=[];for(const r of enc){const pts=[];let x=0,y=0;for(let i=0;i<r.length;i+=2){x+=r[i];y+=r[i+1];pts.push([x*q,y*q]);}out.push(pts);}return out;}
+function ringsPath(rings){const p=new Path2D();p._rings=rings;for(const r of rings){r.forEach((pt,i)=>i?p.lineTo(pt[0],pt[1]):p.moveTo(pt[0],pt[1]));p.closePath();}return p;}
+// ---------- OpenStreetMap basemap: Web Mercator tiles warped onto the map's NC State Plane (feet) grid, one affine per tile ----------
+let STATEIN=null;const BASE={on:false,cache:{},alpha:0.62};
+const LCC=(()=>{const a=6378137,f=1/298.257222101,e=Math.sqrt(2*f-f*f),FT=0.304800609601219,R=Math.PI/180;const m=p=>Math.cos(p)/Math.sqrt(1-e*e*Math.sin(p)**2);
+  const t=p=>Math.tan(Math.PI/4-p/2)/Math.pow((1-e*Math.sin(p))/(1+e*Math.sin(p)),e/2);const p1=34.3333333333333*R,p2=36.1666666666667*R,p0=33.75*R,l0=-79*R;
+  const n=(Math.log(m(p1))-Math.log(m(p2)))/(Math.log(t(p1))-Math.log(t(p2))),F=m(p1)/(n*Math.pow(t(p1),n)),r0=a*F*Math.pow(t(p0),n);
+  return {fwd(lon,lat){const rho=a*F*Math.pow(t(lat*R),n),th=n*(lon*R-l0);return [2000000+rho*Math.sin(th)/FT,(r0-rho*Math.cos(th))/FT];},
+    inv(X,Y){const x=(X-2000000)*FT,y=r0-Y*FT;const rho=Math.sign(n)*Math.hypot(x,y),th=Math.atan2(x,y),tt=Math.pow(rho/(a*F),1/n);let ph=Math.PI/2-2*Math.atan(tt);
+      for(let i=0;i<6;i++)ph=Math.PI/2-2*Math.atan(tt*Math.pow((1-e*Math.sin(ph))/(1+e*Math.sin(ph)),e/2));return [(th/n+l0)/R,ph/R];}};})();
+const tile2ll=(x,y,z)=>{const n=2**z;const lon=x/n*360-180;const lat=Math.atan(Math.sinh(Math.PI*(1-2*y/n)))*180/Math.PI;return [lon,lat];};
+const ll2tile=(lon,lat,z)=>{const n=2**z,r=lat*Math.PI/180;return [(lon+180)/360*n,(1-Math.log(Math.tan(r)+1/Math.cos(r))/Math.PI)/2*n];};
+function osmTiles(W,H){ // tiles covering the device-pixel view, each with its affine matrix (device px)
+  const wx=X=>(X-VIEW.tx)/VIEW.s,wy=Y=>-(Y-VIEW.ty)/VIEW.s;let lo0=1e9,la0=1e9,lo1=-1e9,la1=-1e9;
+  for(const [X,Y] of [[0,0],[W,0],[0,H],[W,H],[W/2,0],[W/2,H],[0,H/2],[W,H/2]]){const [lo,la]=LCC.inv(wx(X),wy(Y));lo0=Math.min(lo0,lo);lo1=Math.max(lo1,lo);la0=Math.min(la0,la);la1=Math.max(la1,la);}
+  const mpp=0.3048/VIEW.s;let z=Math.round(Math.log2(156543.03*Math.cos(35.5*Math.PI/180)/mpp));z=Math.max(4,Math.min(18,z));
+  let a,b,c,d;for(;;){[a,c]=ll2tile(lo0,la1,z);[b,d]=ll2tile(lo1,la0,z);if((Math.floor(b)-Math.floor(a)+1)*(Math.floor(d)-Math.floor(c)+1)<=120||z<=4)break;z--;}
+  const out=[],P=(lo,la)=>{const [x,y]=LCC.fwd(lo,la);return [x*VIEW.s+VIEW.tx,-y*VIEW.s+VIEW.ty];};
+  for(let x=Math.floor(a);x<=Math.floor(b);x++)for(let y=Math.floor(c);y<=Math.floor(d);y++){if(y<0||y>=2**z)continue;const xx=((x%2**z)+2**z)%2**z;
+    const url=`https://tile.openstreetmap.org/${z}/${xx}/${y}.png`;let im=BASE.cache[url];
+    if(!im){im=new Image();im.crossOrigin='anonymous';im.onload=()=>{if(BASE.on)draw();};im.src=url;BASE.cache[url]=im;}
+    const nw=P(...tile2ll(x,y,z)),ne=P(...tile2ll(x+1,y,z)),sw=P(...tile2ll(x,y+1,z));
+    const sub=[];const N=4,q=256/N;   // 4x4 pieces per tile, each with its own affine, so the warp leaves no seams
+    for(let i=0;i<N;i++)for(let j=0;j<N;j++){const a0=P(...tile2ll(x+i/N,y+j/N,z)),a1=P(...tile2ll(x+(i+1)/N,y+j/N,z)),a2=P(...tile2ll(x+i/N,y+(j+1)/N,z));sub.push({sx:i*q,sy:j*q,q,m:[(a1[0]-a0[0])/q,(a1[1]-a0[1])/q,(a2[0]-a0[0])/q,(a2[1]-a0[1])/q,a0[0],a0[1]]});}
+    out.push({im,url,sub,m:[(ne[0]-nw[0])/256,(ne[1]-nw[1])/256,(sw[0]-nw[0])/256,(sw[1]-nw[1])/256,nw[0],nw[1]]});}
+  return out;}
+function drawTiles(g,tiles,pre){for(const t of tiles){if(!t.im.complete||!t.im.naturalWidth)continue;for(const u of t.sub){const m=u.m;g.save();g.transform(...(pre||[1,0,0,1,0,0]));g.transform(m[0],m[1],m[2],m[3],m[4],m[5]);g.drawImage(t.im,u.sx,u.sy,u.q,u.q,-0.4,-0.4,u.q+0.8,u.q+0.8);g.restore();}}}
+document.getElementById('tg-osm').addEventListener('change',e=>{BASE.on=e.target.checked;document.getElementById('osmattr').classList.toggle('hide',!BASE.on);draw();});
+const PLAN={};let PLACES=null;const CITYP={};
+async function cityShape(name){if(CITYP[name])return CITYP[name];if(!PLACES)PLACES=await load('geo/places.json');const enc=PLACES.c[name];if(!enc)return null;
+  const rings=decodeRings(enc,PLACES.q);let a=1e12,b=1e12,c=-1e12,d=-1e12;for(const r of rings)for(const [x,y] of r){if(x<a)a=x;if(x>c)c=x;if(y<b)b=y;if(y>d)d=y;}
+  return CITYP[name]={path:ringsPath(rings),bb:[a,b,c,d]};}
+async function plan(id){if(PLAN[id])return PLAN[id];const d=await load('plans/'+id+'.json');const D={};
+  for(const k in d.d){const rings=decodeRings(d.d[k],d.q);let x0=1e12,y0=1e12,x1=-1e12,y1=-1e12,big=null,ba=-1;
+    for(const r of rings){let a=0;for(let i=0;i<r.length-1;i++)a+=r[i][0]*r[i+1][1]-r[i+1][0]*r[i][1];a=Math.abs(a/2);if(a>ba){ba=a;big=r;}for(const [x,y] of r){if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y;}}
+    D[k]={path:ringsPath(rings),bb:[x0,y0,x1,y1],big};}
+  PLAN[id]={...d,...relabel(d),D};return PLAN[id];}
+function yrsLabel(ys){ys=[...ys].sort((a,b)=>a-b);const out=[];let s=ys[0],p=ys[0];for(const y of ys.slice(1)){if(y===p+2){p=y;continue;}out.push(s===p?`${s}`:`${s}–${p}`);s=p=y;}out.push(s===p?`${s}`:`${s}–${p}`);return out.join(', ');}
+function relabel(p){const name=String(p.label).replace(/\s*\([^)]*\)\s*$/,'');const yrs=yrsLabel(p.years);return {yrs,name,label:`${yrs} (${name})`};}
+const XW={};async function xw(set){if(set==='2026')return null;if(!XW[set])XW[set]=await load('xw/x'+set+'.json');return XW[set];}
+// ---------- catalog / picker ----------
+let CAT=[];
+function buildCat(){CAT=[];for(const e of IDX.elections)e.contests.forEach((c,i)=>CAT.push({e,i,c,g:c.g,o:c.o,d:c.d,p:c.p||'',year:e.year,kind:e.kind}));}
+function stageLabel(e,p){if(e.kind==='registration')return 'As of '+e.date;if(e.kind==='general')return 'General, '+e.date;
+  if(e.kind==='municipal')return (p?(PARTYNAME[p]||p)+' municipal primary':'Municipal election')+', '+e.date;const pn=p?(PARTYNAME[p]||p):'Nonpartisan';return pn+' '+KINDN[e.kind]+', '+e.date;}
+function stageText(e,p){if(e.kind==='general')return `${e.year} general election`;if(e.kind==='municipal')return p?`${e.year} ${PARTYNAME[p]||p} municipal primary (${e.date})`:`${e.date} municipal election`;return `${e.year} ${p?(PARTYNAME[p]||p):'nonpartisan'} ${KINDN[e.kind]}`;}
+const natCmp=(a,b)=>String(a).localeCompare(String(b),'en',{numeric:true});
+function placeLabel(o,d){return o==='superior'||o==='district'?d:o==='mayor'?d:d+' County';}
+function raceLab(c){let n=c.lab||(c.o==='cc'?'Countywide':'Regular term');if(c.note==='unexpired')n+=' (unexpired)';return n;}
+function raceTitle(c){const o=c.o;if(o==='supreme')return 'Supreme Court '+(c.lab||'');if(o==='coa')return 'Court of Appeals '+(c.lab&&c.lab!=='Judge'?'('+c.lab+')':'');
+  if(o==='superior'||o==='district')return `${OFFN[o]} ${c.d}${c.lab?' '+c.lab:''}`;if(o==='mayor')return `${c.d} Mayor`;if(o==='cc')return `${c.d} County Commission${c.lab&&c.lab!=='Countywide'?' '+c.lab:''}`;return `${c.d} County ${OFFN[o]}`;}
+function el(t,a={},kids=[]){const n=document.createElement(t);for(const k in a){if(k==='text')n.textContent=a[k];else if(k==='html')n.innerHTML=a[k];else n.setAttribute(k,a[k]);}kids.forEach(k=>n.appendChild(k));return n;}
+function sel(id,opts,val){const s=el('select',{id});for(const [v,l] of opts){const o=el('option',{value:v,text:l});if(String(v)===String(val))o.selected=true;s.appendChild(o);}return s;}
+class Picker{
+  constructor(root,pfx,state,onChange,opts={}){this.root=root;this.pfx=pfx;this.s=Object.assign({g:'president',o:'',year:2024,stage:'',d:'all',v:0},state);this.onChange=onChange;this.opts=opts;this.render();}
+  rows(){return CAT.filter(x=>x.g===this.s.g&&(this.s.g==='cos'||this.s.g==='leg'||SUBG(this.s.g)?x.o===this.s.o:true));}
+  render(){
+    const s=this.s,r=this.root;r.innerHTML='';const grid=el('div',{class:'pick'});r.appendChild(grid);
+    const add=(lab,node)=>{grid.appendChild(el('label',{for:node.id,text:lab}));grid.appendChild(node);};
+    const gsel=sel(this.pfx+'g',GROUPS,s.g);add('Office',gsel);gsel.onchange=()=>{s.g=gsel.value;s.o=s.g==='cos'?'governor':s.g==='leg'?'house':s.g==='local'?LOCALTYPES[0][0]:s.g==='courts'?COURTS[0][0]:'';s.d='all';s.v=0;this.fix();};
+    if(SUBG(s.g)){const L=s.g==='courts'?COURTS:LOCALTYPES;if(!L.find(t=>t[0]===s.o))s.o=L[0][0];const ts=sel(this.pfx+'o',L,s.o);add(s.g==='courts'?'Court':'Type',ts);ts.onchange=()=>{s.o=ts.value;s.d='all';s.v=0;this.fix();};}
+    if(s.g==='cos'){if(!s.o)s.o='governor';const os=sel(this.pfx+'o',COS,s.o);add('Race',os);os.onchange=()=>{s.o=os.value;this.fix();};}
+    if(s.g==='leg'){if(!s.o)s.o='house';const os=sel(this.pfx+'o',[['house','State House'],['senate','State Senate']],s.o);add('Chamber',os);os.onchange=()=>{s.o=os.value;this.fix();};}
+    let R=this.rows();const years=[...new Set(R.map(x=>x.year))].sort((a,b)=>b-a);
+    if(!years.includes(+s.year))s.year=years[0];
+    const ys=sel(this.pfx+'y',years.map(y=>[y,y]),s.year);add('Year',ys);ys.onchange=()=>{s.year=+ys.value;this.fix();};
+    R=R.filter(x=>x.year===+s.year);
+    const MAY=s.g==='local'&&s.o==='mayor';
+    if(MAY){ // mayors: every city with a race this year, then that city's primaries, runoffs and general
+      const cs=[...new Set(R.map(x=>x.d))].sort(natCmp);if(!cs.includes(s.d))s.d=cs[0];
+      const cty=sel(this.pfx+'d',cs.map(c=>[c,c]),s.d);add('City',cty);cty.onchange=()=>{s.d=cty.value;s.v=0;this.fix();};R=R.filter(x=>x.d===s.d);}
+    const stOrd=MAY?((a,b)=>Date.parse(a.e.date.replace(/^(\w+) (\d{4})$/,'$1 1, $2'))-Date.parse(b.e.date.replace(/^(\w+) (\d{4})$/,'$1 1, $2'))||a.p.localeCompare(b.p)):((a,b)=>(a.kind==='general'?0:1)-(b.kind==='general'?0:1)||a.e.id.localeCompare(b.e.id)||a.p.localeCompare(b.p));
+    const st=[];const seen=new Set();for(const x of R.sort(stOrd)){const k=x.e.id+'|'+x.p;if(!seen.has(k)){seen.add(k);st.push([k,stageLabel(x.e,x.p)]);}}
+    if(!st.find(z=>z[0]===s.stage))s.stage=st[0][0];
+    const ss=sel(this.pfx+'s',st,s.stage);add('Election',ss);ss.onchange=()=>{s.stage=ss.value;this.fix();};
+    const [eid,p]=s.stage.split('|');R=R.filter(x=>x.e.id===eid&&x.p===p);
+    if(SUBG(s.g)){const places=MAY?[]:[...new Set(R.map(x=>x.d))].filter(d=>d!=='').sort(natCmp);const allOK=(s.o==='sheriff'||s.o==='clerk')&&places.length>1&&this.opts.allowAll!==false;
+      if(places.length){const op=(allOK?[['all','All counties']]:[]).concat(places.map(d=>[d,placeLabel(s.o,d)]));if(!op.find(z=>String(z[0])===String(s.d)))s.d=op[0][0];
+        const ps=sel(this.pfx+'d',op,s.d);add(s.o==='mayor'?'City':s.o==='superior'||s.o==='district'?'District':'County',ps);ps.onchange=()=>{s.d=ps.value;s.v=0;this.fix();};if(s.d!=='all')R=R.filter(x=>x.d===s.d);}
+      else if(!MAY)s.d='';
+      if(s.d==='all'){this.sel={e:R[0].e,all:R};return;}
+      R.sort((a,b)=>natCmp(raceLab(a.c),raceLab(b.c)));if(s.lab!=null){const i=R.findIndex(x=>x.c.lab===s.lab);if(i>=0)s.v=i;s.lab=null;}
+      if(R.length>1){const vs=sel(this.pfx+'v',R.map((x,i)=>[i,raceLab(x.c)]),Math.min(s.v,R.length-1));add('Race',vs);vs.onchange=()=>{s.v=+vs.value;this.fix();};}else s.v=0;
+      this.sel={e:R[Math.min(s.v,R.length-1)].e,one:R[Math.min(s.v,R.length-1)]};return;}
+    if(s.g==='ushouse'||s.g==='leg'){const ds=[...new Set(R.map(x=>x.d))].sort((a,b)=>a-b);const op=(this.opts.allowAll===false||(this.opts.noAllPrimary&&!eid.startsWith('g'))?[]:[['all','All districts']]).concat(ds.map(d=>[d,'District '+d]));
+      if(!op.find(z=>String(z[0])===String(s.d)))s.d=op[0][0];const dsel=sel(this.pfx+'d',op,s.d);add('District',dsel);dsel.onchange=()=>{s.d=dsel.value;this.fix();};
+      if(s.d!=='all')R=R.filter(x=>String(x.d)===String(s.d));}
+    if(!(s.g==='ushouse'||s.g==='leg')||s.d!=='all'){if(R.length>1){const vs=sel(this.pfx+'v',R.map((x,i)=>[i,x.c.g==='reg'?({party:'All parties',dr:'Democrats vs. Republicans',race:'Race and ethnicity'})[x.c.o]:x.c.note==='unexpired'?'Unexpired term':'Regular term']),Math.min(s.v,R.length-1));add('Contest',vs);vs.onchange=()=>{s.v=+vs.value;this.fix();};}else s.v=0;}
+    this.sel=(s.d==='all'&&(s.g==='ushouse'||s.g==='leg'))?{e:R[0].e,all:R}:{e:R[Math.min(s.v,R.length-1)].e,one:R[Math.min(s.v,R.length-1)]};
+  }
+  fix(){ // switching to a districted election shows its own district lines; otherwise the lines on screen are kept
+    const lead=this===PA||(MODE==='cmp'&&this===PB);
+    if(lead&&OPT.ovl==='auto'&&LASTPLAN){OPT.ovl=LASTPLAN;}
+    this.render();
+    if(lead){const own=ownPlanOf(this);if(own)OPT.ovl=own;syncOvl();}
+    OPT.picked=false;this.onChange();}
+}
+// ---------- computing per-shape values ----------
+function partyKey(p){p=(p||'').toUpperCase();return p==='DEM'?'D':p==='REP'?'R':'O';}
+function contestUncontested(c){const maj=new Set(c.cp.map(partyKey).filter(k=>k!=='O'));const n=c.c.length,vf=c.vf||1;
+  if(n<=vf){const has=new Set(c.cp.map(partyKey));if(has.has('D')&&has.has('R'))return 'P';return maj.size?[...maj][0]:'O';}
+  return null;}
+function contestVotes(c){const n=c.c.length,M=new Map();for(let i=0;i<c.s.length;i++)M.set(c.s[i],c.v.slice(i*n,i*n+n));return M;}
+async function getContests(selx){const r=await load('res/'+selx.e.id+'.json');return selx.all?selx.all.map(x=>r.contests[x.i]):[r.contests[selx.one.i]];}
+// for a general election: per shape {D,R,O}; for a primary: per shape candidate rank vector of the contest
+function shapeParty(contests){const M=new Map();for(const c of contests){const n=c.c.length,pk=c.cp.map(partyKey);
+  for(let i=0;i<c.s.length;i++){const k=c.s[i];let a=M.get(k);if(!a){a={D:0,R:0,O:0,best:null,bt:-1,unc:null};M.set(k,a);}let t=0;
+    for(let j=0;j<n;j++){const v=c.v[i*n+j];a[pk[j]]+=v;t+=v;}if(t>a.bt){a.bt=t;a.best=c;a.unc=contestUncontested(c);}}}
+  return M;}
+// ---------- map view state ----------
+const cv=document.getElementById('map'),ctx=cv.getContext('2d');
+let VIEW={tx:0,ty:0,s:1},LAYERS=null,HOME=null;
+function resize(){const r=cv.parentElement.getBoundingClientRect(),dpr=window.devicePixelRatio||1;cv.width=Math.round(r.width*dpr);cv.height=Math.round(r.height*dpr);}
+function fit(bb,pad=0.04){const W=cv.width,H=cv.height,w=bb[2]-bb[0],h=bb[3]-bb[1];const s=Math.min(W*(1-2*pad)/w,H*(1-2*pad)/h);VIEW={s,tx:W/2-(bb[0]+bb[2])/2*s,ty:H/2+(bb[1]+bb[3])/2*s};HOME={...VIEW};}
+function setT(){ctx.setTransform(VIEW.s,0,0,-VIEW.s,VIEW.tx,VIEW.ty);}
+const patCache={};
+function hatch(color){if(patCache[color])return patCache[color];const c=document.createElement('canvas');c.width=c.height=10;const g=c.getContext('2d');g.fillStyle='#ffffff';g.fillRect(0,0,10,10);g.globalAlpha=.55;g.fillStyle=color;g.fillRect(0,0,10,10);g.globalAlpha=1;g.strokeStyle=color;g.lineWidth=2.4;g.beginPath();g.moveTo(-2,12);g.lineTo(12,-2);g.moveTo(-2,2);g.lineTo(2,-2);g.moveTo(8,12);g.lineTo(12,8);g.stroke();patCache[color]=ctx.createPattern(c,'repeat');return patCache[color];}
+const SHOW={num:true,dl:true,cl:true};
+function syncToggles(){syncOvl();{const lv=document.getElementById('tg-lvl');const lok=(MODE==='map'&&!(LAYERS&&LAYERS.noCounty))||MODE==='cmp';lv.disabled=!lok;document.getElementById('lb-lv').classList.toggle('off',!lok);}{const sh=document.getElementById('tg-shade');sh.disabled=MODE==='cmp';document.getElementById('lb-sh').classList.toggle('off',MODE==='cmp');}const L=LAYERS||{};const hasD=!!(L.dlines&&L.dlines.length),hasN=!!(L.labels&&L.labels.length);
+  for(const [id,ok] of [['num',hasN],['dl',hasD]]){const i=document.getElementById('tg-'+id);i.disabled=!ok;document.getElementById('lb-'+id).classList.toggle('off',!ok);}}
+function fillOvl(){const ch={congress:'Congress',senate:'State Senate',house:'State House'};const s=document.getElementById('o-ovl');s.innerHTML='';
+  const ops=[['auto','The election’s own'],['none','None']].concat(IDX.plans.slice().sort((a,b)=>a.chamber.localeCompare(b.chamber)||b.id.localeCompare(a.id)).map(p=>[p.id,`${ch[p.chamber]} ${p.yrs} (${p.name})`]));
+  for(const [v,l] of ops)s.appendChild(el('option',{value:v,text:l}));s.value=OPT.ovl;}
+document.getElementById('o-ovl').addEventListener('change',e=>{OPT.ovl=e.target.value;refresh();});
+document.getElementById('o-crop').addEventListener('change',e=>{OPT.crop=e.target.value;refresh();});
+document.getElementById('o-ccrop').addEventListener('change',e=>{OPT.ccrop=e.target.value;refresh();});
+function syncCCrop(){const s=document.getElementById('o-ccrop');if(!s.dataset.ok&&COUNTY){for(const c of Object.keys(COUNTY).sort())s.appendChild(el('option',{value:c,text:titleCase(c)+' County'}));s.dataset.ok='1';}s.value=OPT.ccrop;}
+function cropAllowed(){if(MODE!=='map'||!PA||!PA.sel)return false;const s=PA.s;return !((s.g==='ushouse'||s.g==='leg'));}
+async function syncCrop(){const s=document.getElementById('o-crop');const ov=resolvePlan();const ok=cropAllowed()&&!!ov;
+  let ids=[];if(ok){const OP=await plan(ov);ids=Object.keys(OP.D).sort((a,b)=>+a-+b);s.dataset.plan=ov;}
+  const key=(ok?ov:'')+'|'+ids.length;if(s.dataset.key!==key){s.innerHTML='';s.appendChild(el('option',{value:'',text:'Whole map'}));for(const d of ids)s.appendChild(el('option',{value:d,text:'District '+d}));s.dataset.key=key;}
+  if(!ids.includes(OPT.crop))OPT.crop='';s.value=OPT.crop;s.disabled=!ok;document.getElementById('lb-crop').classList.toggle('off',!ok);}
+document.getElementById('tg-lvl').addEventListener('change',e=>{LVL=e.target.value;refresh();});
+document.getElementById('tg-comb').addEventListener('change',e=>{OPT.combine=e.target.checked;refresh();});
+document.getElementById('tg-shade').addEventListener('change',e=>{SHADE=e.target.value;refresh();});
+for(const k of ['num','dl','cl'])document.getElementById('tg-'+k).addEventListener('change',e=>{SHOW[k]=e.target.checked;draw();});
+function distLabels(PL,ids,darkOf){return ids.filter(d=>PL.D[d]).map(d=>{const D=PL.D[d];if(!D.lab)D.lab=poleish(D.big);return {x:D.lab[0],y:D.lab[1],t:String(d),dark:darkOf?darkOf(d):false};});}
+// fast interaction: while panning/zooming, redraw a scaled snapshot; the full redraw runs once the gesture pauses
+let SNAP=null,DT=null,RAF=0;
+function snap(){if(!SNAP)SNAP={c:document.createElement('canvas')};SNAP.c.width=cv.width;SNAP.c.height=cv.height;SNAP.c.getContext('2d').drawImage(cv,0,0);SNAP.v={...VIEW};}
+function quick(){RAF=0;if(!SNAP||!SNAP.v||SNAP.c.width!==cv.width){drawFull();return;}const f=VIEW.s/SNAP.v.s;ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle='#ffffff';ctx.fillRect(0,0,cv.width,cv.height);ctx.imageSmoothingEnabled=f<1.5;ctx.setTransform(f,0,0,f,VIEW.tx-SNAP.v.tx*f,VIEW.ty-SNAP.v.ty*f);ctx.drawImage(SNAP.c,0,0);ctx.setTransform(1,0,0,1,0,0);}
+function interact(){if(!RAF)RAF=requestAnimationFrame(quick);clearTimeout(DT);DT=setTimeout(draw,140);}
+function draw(){clearTimeout(DT);if(RAF){cancelAnimationFrame(RAF);RAF=0;}drawFull();snap();}
+function drawFull(){
+  ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle='#ffffff';ctx.fillRect(0,0,cv.width,cv.height);if(!LAYERS)return;
+  if(BASE.on)drawTiles(ctx,osmTiles(cv.width,cv.height));
+  setT();const L=LAYERS,lw=1/VIEW.s;
+  ctx.save();if(L.clip)ctx.clip(L.clip);if(L.clip2)ctx.clip(L.clip2);if(BASE.on&&STATEIN)ctx.clip(STATEIN);
+  ctx.globalAlpha=BASE.on?BASE.alpha:1;
+  const paint=it=>{ctx.fillStyle=it.f;ctx.fill(it.p);if(it.hatch){const pt=hatch(it.hatch);try{pt.setTransform(new DOMMatrix([1/VIEW.s,0,0,-1/VIEW.s,0,0]));}catch(_){}ctx.fillStyle=pt;ctx.fill(it.p);}ctx.strokeStyle=it.stroke||it.f;ctx.lineWidth=0.6*lw;ctx.stroke(it.p);};
+  for(const it of L.fills)paint(it);
+  if(L.groups)for(const g of L.groups){ctx.save();ctx.clip(g.clip);for(const it of g.fills)paint(it);ctx.restore();}
+  if(L.thin){ctx.strokeStyle='rgba(255,255,255,.55)';ctx.lineWidth=0.5*lw;for(const p of L.thin)ctx.stroke(p);}
+  ctx.restore();ctx.globalAlpha=1;
+  if(L.mask&&!BASE.on){ctx.save();ctx.fillStyle='#ffffff';ctx.fill(L.mask,'evenodd');ctx.restore();}
+  syncToggles();
+  if(SHOW.cl){ctx.strokeStyle='#2b2b2b';ctx.lineWidth=0.7*lw;for(const p of L.counties)ctx.stroke(p);}
+  if(L.dlines&&SHOW.dl){ctx.strokeStyle='#000';ctx.lineWidth=(L.dw||1.4)*lw;for(const p of L.dlines)ctx.stroke(p);}
+  if(L.labels&&L.labels.length&&SHOW.num){ctx.save();ctx.setTransform(1,0,0,1,0,0);ctx.textAlign='center';ctx.textBaseline='middle';const dpr=window.devicePixelRatio||1;ctx.font=`700 ${12*dpr}px Inter,sans-serif`;
+    for(const lb of L.labels){const X=lb.x*VIEW.s+VIEW.tx,Y=-lb.y*VIEW.s+VIEW.ty;ctx.lineWidth=3*dpr;ctx.strokeStyle=lb.dark?'rgba(0,0,0,.35)':'rgba(255,255,255,.85)';ctx.strokeText(lb.t,X,Y);ctx.fillStyle=lb.dark?'#fff':'#1d2421';ctx.fillText(lb.t,X,Y);}ctx.restore();}
+}
+
+// ---------- export (PNG / SVG) ----------
+function pathRings(p){if(!p)return [];if(p._rings)return p._rings;if(p._enc){const out=[];for(const r of p._enc){const pts=[];let x=0,y=0;for(let i=0;i<r.length;i+=2){x+=r[i];y+=r[i+1];pts.push([x*p._q,y*p._q]);}out.push(pts);}return out;}return [];}
+function svgD(p,W,H,cull){const dpr=window.devicePixelRatio||1;let d='',any=!cull;
+  for(const r of pathRings(p)){let seg='',lx=null,ly=null,n=0,a=1e9,b=1e9,c=-1e9,e=-1e9;
+    for(const [x,y] of r){const X=Math.round((x*VIEW.s+VIEW.tx)/dpr*10)/10,Y=Math.round((-y*VIEW.s+VIEW.ty)/dpr*10)/10;if(X===lx&&Y===ly)continue;seg+=(n?'L':'M')+X+' '+Y;lx=X;ly=Y;n++;if(X<a)a=X;if(X>c)c=X;if(Y<b)b=Y;if(Y>e)e=Y;}
+    if(n<2)continue;if(cull&&(c<0||a>W||e<0||b>H))continue;any=true;d+=seg+'Z';}
+  return any?d:'';}
+const xesc=t=>String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+function wrapText(t,font,maxW){const c=document.createElement('canvas').getContext('2d');c.font=font;const out=[];let line='';for(const w of String(t).split(/\s+/)){if(!w)continue;const tr=line?line+' '+w:w;if(c.measureText(tr).width>maxW&&line){out.push(line);line=w;}else line=tr;}if(line)out.push(line);return out;}
+function textW(t,font){const c=document.createElement('canvas').getContext('2d');c.font=font;return c.measureText(t).width;}
+function buildSVG(opt){opt=opt||{};
+  const L=LAYERS;if(!L)return null;const W=Math.round(cv.clientWidth),H=Math.round(cv.clientHeight),PAD=24,FW=W+2*PAD;const FONT='Inter,Helvetica,Arial,sans-serif';
+  const defs=[],body=[];let cid=0;const clipId=p=>{const id='c'+(cid++);defs.push(`<clipPath id="${id}"><path d="${svgD(p,W,H,false)}"/></clipPath>`);return id;};
+  const hat={};const hatchId=col=>{if(hat[col])return hat[col];const id='h'+Object.keys(hat).length;hat[col]=id;defs.push(`<pattern id="${id}" width="7" height="7" patternUnits="userSpaceOnUse"><rect width="7" height="7" fill="#fff"/><rect width="7" height="7" fill="${col}" opacity=".55"/><path d="M-1.4 8.4L8.4-1.4M-1.4 1.4L1.4-1.4M5.6 8.4L8.4 5.6" stroke="${col}" stroke-width="1.7"/></pattern>`);return id;};
+  const fillEl=it=>{const d=svgD(it.p,W,H,true);if(!d)return '';let o=`<path d="${d}"${BASE.on?` fill-opacity="${BASE.alpha}" stroke-opacity="${BASE.alpha}"`:''} fill="${it.f}" stroke="${it.stroke||it.f}" stroke-width="0.6" stroke-linejoin="round"/>`;if(it.hatch)o+=`<path d="${d}" fill="url(#${hatchId(it.hatch)})"/>`;return o;};
+  // map
+  const mp=[];let open=0;
+  if(L.clip){mp.push(`<g clip-path="url(#${clipId(L.clip)})">`);open++;}
+  if(L.clip2){mp.push(`<g clip-path="url(#${clipId(L.clip2)})">`);open++;}
+  if(BASE.on&&STATEIN){mp.push(`<g clip-path="url(#${clipId(STATEIN)})">`);open++;}
+  for(const it of L.fills)mp.push(fillEl(it));
+  if(L.groups)for(const g of L.groups){mp.push(`<g clip-path="url(#${clipId(g.clip)})">`);for(const it of g.fills)mp.push(fillEl(it));mp.push('</g>');}
+  if(L.thin){const d=L.thin.map(p=>svgD(p,W,H,true)).join('');if(d)mp.push(`<path d="${d}" fill="none" stroke="#ffffff" stroke-opacity=".55" stroke-width="0.5"/>`);}
+  while(open-->0)mp.push('</g>');
+  if(L.mask&&!BASE.on)mp.push(`<path d="${svgD(L.mask,W,H,false)}" fill="#ffffff" fill-rule="evenodd"/>`);
+  if(SHOW.cl&&L.counties){const d=L.counties.map(p=>svgD(p,W,H,true)).join('');mp.push(`<path d="${d}" fill="none" stroke="#2b2b2b" stroke-width="0.7" stroke-linejoin="round"/>`);}
+  if(L.dlines&&SHOW.dl){const d=L.dlines.map(p=>svgD(p,W,H,true)).join('');if(d)mp.push(`<path d="${d}" fill="none" stroke="#000" stroke-width="${L.dw||1.4}" stroke-linejoin="round"/>`);}
+  if(L.labels&&L.labels.length&&SHOW.num){const dpr=window.devicePixelRatio||1;for(const lb of L.labels){const X=(lb.x*VIEW.s+VIEW.tx)/dpr,Y=(-lb.y*VIEW.s+VIEW.ty)/dpr;if(X<0||X>W||Y<0||Y>H)continue;
+    mp.push(`<text x="${X.toFixed(1)}" y="${Y.toFixed(1)}" text-anchor="middle" dominant-baseline="central" font-family="${FONT}" font-weight="700" font-size="12" stroke="${lb.dark?'rgba(0,0,0,.35)':'rgba(255,255,255,.85)'}" stroke-width="3" paint-order="stroke" fill="${lb.dark?'#fff':'#1d2421'}">${xesc(lb.t)}</text>`);}}
+  // header
+  let y=PAD;const tl=wrapText(document.getElementById('title').textContent,`700 20px ${FONT}`,W);const sl=wrapText(document.getElementById('subtitle').textContent,`400 13px ${FONT}`,W);
+  for(const t of tl){y+=24;body.push(`<text x="${PAD}" y="${y}" font-family="${FONT}" font-size="20" font-weight="700" fill="#1d2421">${xesc(t)}</text>`);}
+  y+=4;for(const t of sl){y+=17;body.push(`<text x="${PAD}" y="${y}" font-family="${FONT}" font-size="13" fill="#5b625e">${xesc(t)}</text>`);}
+  y+=12;const mapY=y;let tl_='';
+  if(BASE.on&&opt.tiles!==false){const dpr=window.devicePixelRatio||1;tl_=osmTiles(W*dpr,H*dpr).filter(t=>t.im.complete&&t.im.naturalWidth).map(t=>{const m=t.m.map(v=>+(v/dpr).toFixed(4));return `<image href="${t.url}" width="256" height="256" transform="matrix(${m[0]} ${m[1]} ${m[2]} ${m[3]} ${m[4]} ${m[5]})"/>`;}).join('');}
+  body.push(`<g transform="translate(${PAD},${y})"><clipPath id="mapclip"><rect width="${W}" height="${H}"/></clipPath><g clip-path="url(#mapclip)">${BASE.on?'':`<rect width="${W}" height="${H}" fill="#ffffff"/>`}${tl_}${mp.join('')}</g></g>`);y+=H+18;
+  if(BASE.on){body.push(`<text x="${PAD+W}" y="${y-22}" text-anchor="end" font-family="${FONT}" font-size="9.5" fill="#333">© OpenStreetMap contributors</text>`);}
+  // legend, read from the page
+  const cols=[...document.querySelectorAll('#legend .lg')].map(lg=>{const h=(lg.querySelector('h3')||{}).textContent||'';const items=[...lg.querySelectorAll('.sw')].map(sw=>{const i=sw.querySelector('i');return {c:i&&i.dataset.c||(i?getComputedStyle(i).backgroundColor:'#ccc'),h:i&&i.dataset.h,t:sw.textContent};});
+    const w=Math.max(textW(h.toUpperCase(),`700 10.5px ${FONT}`),...items.map(it=>22+textW(it.t,`400 11.5px ${FONT}`)));return {h,items,w};});
+  let x=PAD,rowH=0,y0=y;
+  for(const c of cols){const ch=16+c.items.length*17;if(x>PAD&&x+c.w>PAD+W){x=PAD;y0+=rowH+12;rowH=0;}
+    body.push(`<text x="${x}" y="${y0+10}" font-family="${FONT}" font-size="10.5" font-weight="700" letter-spacing=".6" fill="#3b4440">${xesc(c.h.toUpperCase())}</text>`);
+    c.items.forEach((it,k)=>{const yy=y0+18+k*17;const f=it.h?`url(#${hatchId(it.h)})`:it.c;body.push(`<rect x="${x}" y="${yy}" width="16" height="12" fill="${f}" stroke="rgba(0,0,0,.25)"/><text x="${x+22}" y="${yy+10}" font-family="${FONT}" font-size="11.5" fill="#1d2421">${xesc(it.t)}</text>`);});
+    x+=c.w+26;rowH=Math.max(rowH,ch);}
+  y=y0+rowH+(cols.length?14:0);
+  const nl=wrapText(document.getElementById('note').textContent,`400 10.5px ${FONT}`,W);for(const t of nl){y+=14;body.push(`<text x="${PAD}" y="${y}" font-family="${FONT}" font-size="10.5" fill="#6b716d">${xesc(t)}</text>`);}
+  y+=PAD;
+  return {svg:`<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="${FW}" height="${Math.ceil(y)}" viewBox="0 0 ${FW} ${Math.ceil(y)}"><defs>${defs.join('')}</defs>${opt.bg===false?'':'<rect width="100%" height="100%" fill="#ffffff"/>'}${body.join('')}</svg>`,w:FW,h:Math.ceil(y),mapY,W,H,PAD};}
+function exportName(ext){return (document.getElementById('title').textContent||'nc-election-map').replace(/[—–]/g,'-').replace(/[^\w\- ,.]+/g,'').replace(/[ ,.]+/g,'_').replace(/_+/g,'_').slice(0,120)+'.'+ext;}
+async function saveFile(filename,blob){
+  let dl=null;try{dl=window.claude&&await window.claude.use('downloads');}catch(_){}
+  if(dl){try{await dl.save({filename,data:blob});}catch(e){if(e&&e.code!=='declined')setStatus('Could not save the file ('+(e.code||'error')+').',true);}return;}
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=filename;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},2000);}
+async function exportMap(kind){const b=document.getElementById('exp-'+kind);b.disabled=true;
+  try{const r=buildSVG(kind==='png'?{tiles:false,bg:false}:{});if(!r)return;
+    if(kind==='svg'){await saveFile(exportName('svg'),new Blob([r.svg],{type:'image/svg+xml'}));return;}
+    const img=new Image();const url=URL.createObjectURL(new Blob([r.svg],{type:'image/svg+xml'}));
+    await new Promise((ok,bad)=>{img.onload=ok;img.onerror=bad;img.src=url;});
+    const S=2,c=document.createElement('canvas');c.width=r.w*S;c.height=r.h*S;const g=c.getContext('2d');g.fillStyle='#ffffff';g.fillRect(0,0,c.width,c.height);
+    if(BASE.on){const dpr=window.devicePixelRatio||1;g.save();g.beginPath();g.rect(r.PAD*S,r.mapY*S,r.W*S,r.H*S);g.clip();drawTiles(g,osmTiles(r.W*dpr,r.H*dpr),[S/dpr,0,0,S/dpr,r.PAD*S,r.mapY*S]);g.restore();}
+    g.drawImage(img,0,0,c.width,c.height);URL.revokeObjectURL(url);
+    const blob=await new Promise(ok=>c.toBlob(ok,'image/png'));await saveFile(exportName('png'),blob);}
+  catch(e){setStatus('Export failed: '+(e&&e.message||e),true);}finally{b.disabled=false;}}
+document.getElementById('exp-png').addEventListener('click',()=>exportMap('png'));
+document.getElementById('exp-svg').addEventListener('click',()=>exportMap('svg'));
+// ---------- tooltip ----------
+const tip=document.getElementById('tip');
+function hit(px,py){if(!LAYERS||!LAYERS.hits)return null;const dpr=window.devicePixelRatio||1;const X=px*dpr,Y=py*dpr;const wx=(X-VIEW.tx)/VIEW.s,wy=-(Y-VIEW.ty)/VIEW.s;setT();
+  if(LAYERS.clip&&LAYERS.cropped&&!ctx.isPointInPath(LAYERS.clip,X,Y))return null;
+  if(LAYERS.clip2&&!ctx.isPointInPath(LAYERS.clip2,X,Y))return null;
+  for(let i=LAYERS.hits.length-1;i>=0;i--){const h=LAYERS.hits[i];const b=h.bb;if(wx<b[0]||wx>b[2]||wy<b[1]||wy>b[3])continue;if(ctx.isPointInPath(h.p,X,Y)&&(!h.clip||ctx.isPointInPath(h.clip,X,Y)))return h;}return null;}
+// pointer: pan / zoom / hover
+let drag=null;
+cv.addEventListener('pointerdown',e=>{drag={x:e.clientX,y:e.clientY,tx:VIEW.tx,ty:VIEW.ty,moved:false};cv.setPointerCapture(e.pointerId);cv.classList.add('drag');});
+cv.addEventListener('pointermove',e=>{const dpr=window.devicePixelRatio||1;
+  if(drag){const dx=(e.clientX-drag.x)*dpr,dy=(e.clientY-drag.y)*dpr;if(Math.abs(dx)+Math.abs(dy)>3)drag.moved=true;VIEW.tx=drag.tx+dx;VIEW.ty=drag.ty+dy;interact();tip.classList.add('hide');return;}
+  if(RAF||DT&&SNAP&&SNAP.v&&SNAP.v.s!==VIEW.s)return;
+  const r=cv.getBoundingClientRect();const h=hit(e.clientX-r.left,e.clientY-r.top);
+  if(h&&h.html){tip.innerHTML=h.html();tip.classList.remove('hide');const bx=e.clientX-r.left,by=e.clientY-r.top;const tw=tip.offsetWidth,th=tip.offsetHeight;tip.style.left=Math.min(bx+14,r.width-tw-6)+'px';tip.style.top=(by+th+20>r.height?by-th-10:by+14)+'px';}else tip.classList.add('hide');});
+cv.addEventListener('pointerup',e=>{drag=null;cv.classList.remove('drag');});
+cv.addEventListener('pointerleave',()=>tip.classList.add('hide'));
+function zoomAt(f,X,Y){VIEW.tx=X-(X-VIEW.tx)*f;VIEW.ty=Y-(Y-VIEW.ty)*f;VIEW.s*=f;interact();}
+cv.addEventListener('wheel',e=>{e.preventDefault();const r=cv.getBoundingClientRect(),dpr=window.devicePixelRatio||1;zoomAt(Math.exp(-Math.max(-120,Math.min(120,e.deltaMode===1?e.deltaY*33:e.deltaY))*0.0025),(e.clientX-r.left)*dpr,(e.clientY-r.top)*dpr);},{passive:false});
+document.getElementById('zin').onclick=()=>zoomAt(1.4,cv.width/2,cv.height/2);
+document.getElementById('zout').onclick=()=>zoomAt(1/1.4,cv.width/2,cv.height/2);
+document.getElementById('zfit').onclick=()=>{if(HOME){VIEW={...HOME};draw();}};
+window.addEventListener('resize',()=>{const old=cv.width;resize();if(HOME&&old){const f=cv.width/old;VIEW={s:VIEW.s*f,tx:VIEW.tx*f,ty:VIEW.ty*f};HOME={s:HOME.s*f,tx:HOME.tx*f,ty:HOME.ty*f};}draw();});
+// ---------- helpers ----------
+const fmt=n=>Math.round(n).toLocaleString('en-US');const pct=x=>(x*100).toFixed(1)+'%';
+let SHADE='share';const MEDG=[5,10,20,30,50];const LABM=['','','Under 5 pts','5–10 pts','10–20 pts','20–30 pts','30–50 pts','50+ pts'];
+function LABS(){return SHADE==='margin'?LABM:LAB8;}
+function binS(lead,second,t){if(SHADE==='margin'){const mg=(lead-second)/t*100;return 2+MEDG.filter(e=>mg>=e).length;}return bin8(lead/t);}
+function sec2(c,i){const n=c.c.length;let a=-1,b=0;for(let j=0;j<n;j++){const v=c.v[i*n+j];if(v>a){b=Math.max(a,0);a=v;}else if(v>b)b=v;}return b;}
+function bin8(sh){return Math.max(0,Math.min(7,Math.floor(sh*10)-2));}
+function setStatus(t,warn){const s=document.getElementById('status');s.textContent=t||'';s.className='status'+(warn?' warn':'');}
+function countyPaths(){return Object.values(COUNTY);}
+function nearestFill(G,want,haveKeys,colorOf,setIdx,restrictCty){
+  // want: shape indices (in G) lacking data; colour like nearest shape with data in the same county
+  const byC={};for(const k of haveKeys){if(Math.floor(k/K)!==setIdx)continue;const i=k%K;(byC[G.cty[i]]=byC[G.cty[i]]||[]).push(k);}
+  const out=[];for(const i of want){const L=byC[G.cty[i]];if(!L||(restrictCty&&!restrictCty.has(G.cty[i])))continue;let best=null,bd=1e30;const c=G.cen[i];for(const k of L){const d=G.cen[k%K];const dd=(d[0]-c[0])**2+(d[1]-c[1])**2;if(dd<bd){bd=dd;best=k;}}if(best!==null)out.push([i,best]);}
+  return out;}
+function legendBlock(title,items){const d=el('div',{class:'lg'});d.appendChild(el('h3',{text:title}));for(const [c,l,h] of items){const s=el('div',{class:'sw'});const i=el('i');i.dataset.c=c||'';if(h)i.dataset.h=h;if(h){i.style.background=`repeating-linear-gradient(135deg,${h} 0 2px,#fff 2px 5px)`;}else i.style.background=c;s.appendChild(i);s.appendChild(el('span',{text:l}));d.appendChild(s);}return d;}
+function setHead(t,s){if(SHADE==='margin'&&MODE!=='cmp'&&s)s=s.replace(/its share of registered voters/,'its lead over the next-largest group').replace(/winner’s share of the vote/g,'winner’s margin over the runner-up').replace(/leader’s share of the vote/g,'leader’s margin over the runner-up').replace(/leader’s share/g,'leader’s margin');document.getElementById('title').textContent=t;document.getElementById('subtitle').textContent=s||'';}
+function setNote(t){document.getElementById('note').textContent=t;}
+function planFor(sel){const ch=sel.e?null:null;const g=sel.g;const y=sel.year;if(g==='ushouse')return IDX.planyr.ushouse[y]||null;if(g==='leg')return IDX.planyr[sel.o][y]||null;return null;}
+const LINES_NOTE=sets=>sets[0]==='cty'?'Shown by county':sets[0]==='2006'?'Drawn on the 2006 precinct lines, with 2012 lines for precincts created later':'Drawn on the '+(sets[0]==='2018'?'2017':sets[0])+' precinct lines';
+const NOTE2000=' Guilford, Forsyth, Mecklenburg and Wake 2000 precinct numbers do not match the precinct maps, so results there are estimated: each county’s votes (each district’s, for district races) are spread over its precincts by 2004 presidential turnout and partisanship.';
+function poolNote(e){const nr=' Precinct shapes with no results are colored like the nearest precinct in the same county; they add no votes.';
+  if(e.srt==='all')return 'Early, absentee and provisional votes are counted in each voter’s home precinct (state precinct-sorted results).'+nr;
+  if(e.srt==='most')return 'Early, absentee and provisional votes are counted in each voter’s home precinct (state precinct-sorted results), except in counties and races the sorted files don’t place in home precincts, where they are assigned 60% by election-day precinct share and 40% by party registration.'+nr;
+  return POOL_NOTE;}
+const POOL_NOTE='Early, absentee and provisional votes not reported by precinct are assigned to precincts within the county, 60% by each candidate’s election-day precinct share and 40% by party registration, with precinct totals scaled to registration (2000: election-day share only). Precinct shapes with no results are colored like the nearest precinct in the same county; they add no votes.';
+// ---------- MODE 1: election map ----------
+let MODE='map',PA,PB,OPT={ovl:'auto',crop:'',ccrop:'',bins:'narrow',metric:'auto',ca:0,cb:0,plan:'C2026',trend:'swing'};
+async function drawElection(){
+  const P=PA,sx=P.sel,s=P.s;setStatus('Loading…');
+  const contests=await getContests(sx);const e=sx.e;const sets=e.sets;const Gs=await Promise.all(sets.map(geo));
+  const isGen=genLike(e,contests[0],!!sx.one);const REG=e.kind==='registration';const all=!!sx.all;
+  const pid=(s.g==='ushouse'||s.g==='leg')?(s.g==='ushouse'?IDX.planyr.ushouse[e.year]:IDX.planyr[s.o][e.year]):null;
+  const PL=pid?await plan(pid):null;
+  // values per shape key
+  const fills=[],hits=[];const usedL=new Map();const addUse=(k,lab,c,h)=>{if(!usedL.has(k))usedL.set(k,[c,lab,h]);};
+  const CC=OPT.ccrop||null;const inC=k=>!CC||Gs[Math.floor(k/K)].cty[k%K]===CC;
+  let colorOf;const VAL=new Map();
+  const cands=contests.length===1?contests[0]:null;
+  // candidate colour slots for primaries
+  const slot=c=>{const order=isGen?null:c.c.map((n,j)=>j);return order;};
+  const PRIM_ORDER={DEM:['B','G','Y','P','O','T','K','S','N','L','X'],REP:['R','G','Y','P','O','T','K','S','N','L','X'],'':['T','O','G','P','Y','K','S','N','L','X']};
+  const primColors=primColorsG;
+  if(isGen){const M=shapeParty(contests);
+    for(const [k,a] of M){const t=a.D+a.R+a.O;if(t<=0)continue;const arr=[['D',a.D],['R',a.R],['O',a.O]].sort((x,y)=>y[1]-x[1]);let col,lab,hk,h=null;
+      if(arr[0][1]===arr[1][1]){col=TIE;hk='tie';lab='Tied';}else{const pc={D:'B',R:'R',O:'Y'}[arr[0][0]];const b=binS(arr[0][1],arr[1][1],t);col=RAMP8[pc][b];hk=pc+b;lab=LABS()[b];}
+      if(a.unc){const uc={D:'#416fcd',R:'#d02823',O:'#a88600',P:'#7048a6'}[a.unc];h=uc;col=RAMP8[{D:'B',R:'R',O:'Y',P:'P'}[a.unc]][3];hk='U'+a.unc;lab='Uncontested';}
+      VAL.set(k,{col,h,hk,lab,a,t});}
+  } else if(contests.length===1){const c=contests[0],n=c.c.length,cc=primColors(c);
+    for(let i=0;i<c.s.length;i++){const k=c.s[i];let t=0,m=-1,mi=-1,tie=false;for(let j=0;j<n;j++){const v=c.v[i*n+j];t+=v;if(v>m){m=v;mi=j;tie=false;}else if(v===m)tie=true;}if(t<=0)continue;
+      let col,hk,lab;if(tie){col=TIE;hk='tie';lab='Tied';}else{const b=binS(m,sec2(c,i),t);col=RAMP8[cc[mi]][b];hk=cc[mi]+b;lab=LABS()[b];}VAL.set(k,{col,hk,lab,c,i,t,mi});}
+  } else { // all districts, primary: colour by finishing place in the district
+    const PLC=['B','R','G','X'];
+    for(const c of contests){const n=c.c.length;for(let i=0;i<c.s.length;i++){const k=c.s[i];let t=0,m=-1,mi=-1,tie=false;for(let j=0;j<n;j++){const v=c.v[i*n+j];t+=v;if(v>m){m=v;mi=j;tie=false;}else if(v===m)tie=true;}if(t<=0)continue;
+      const prev=VAL.get(k);if(prev&&prev.t>=t)continue;let col,hk,lab;if(tie){col=TIE;hk='tie';lab='Tied';}else{const pc=PLC[Math.min(mi,PLC.length-1)];const b=binS(m,sec2(c,i),t);col=RAMP8[pc][b];hk=pc+b;lab=LABS()[b];}VAL.set(k,{col,hk,lab,c,i,t,mi,place:mi});}}
+  }
+  // fills (base set first, overlays after)
+  const have=[...VAL.keys()];const ctySet=new Set(have.map(k=>Gs[Math.floor(k/K)].cty[k%K]));
+  const base=Gs[0];const want=[];for(let i=0;i<base.paths.length;i++)if(!VAL.has(i))want.push(i);
+  const partial=(s.g==='local'&&s.o==='cc')||(s.g==='courts'&&s.o==='superior');const nf=partial?[]:nearestFill(base,want,have,null,0,ctySet);
+  const tipFor=(k,v)=>()=>{const G=Gs[Math.floor(k/K)],i=k%K;let h=`<b>${titleCase(G.name[i]||G.code[i])}</b><div class="muted">${titleCase(G.cty[i])} County · ${G.code[i]}</div><table>`;
+    const cs=v.best?[v.best]:v.c?[v.c]:contests;let rows=[];
+    for(const c of cs){const ix=c.s.indexOf(k);if(ix<0)continue;const n=c.c.length;let t=0;for(let j=0;j<n;j++)t+=c.v[ix*n+j];if(cs.length>1||all)h+=`<tr><td colspan="2" class="muted">${contestName(c)}</td></tr>`;
+      c.c.map((nm,j)=>[nm,c.v[ix*n+j],c.cp[j]]).sort((a,b)=>b[1]-a[1]).slice(0,6).forEach(([nm,v,p])=>{h+=`<tr><td>${esc(nm)}${p&&isGen&&!REG?' ('+p[0]+')':''}</td><td class="n">${fmt(v)}</td><td class="n">${t?pct(v/t):''}</td></tr>`;});}
+    return h+'</table>';};
+  // all districts with a plan: each district's own contest, clipped to the district (precincts split along district lines)
+  let groups=null;
+  if(all&&PL){groups=[];const PLC=['B','R','G','X'];
+    for(const c of contests){const D=PL.D[String(c.d)];if(!D)continue;const n=c.c.length,pk=c.cp.map(partyKey);const unc=isGen?contestUncontested(c):null;const V=new Map();
+      for(let i=0;i<c.s.length;i++){let t=0;const sm={D:0,R:0,O:0};let m=-1,mi=-1,tie=false;for(let j=0;j<n;j++){const v=c.v[i*n+j];t+=v;sm[pk[j]]+=v;if(v>m){m=v;mi=j;tie=false;}else if(v===m)tie=true;}if(t<=0)continue;
+        let col,hk,lab,h=null;
+        if(isGen){const arr=[['D',sm.D],['R',sm.R],['O',sm.O]].sort((x,y)=>y[1]-x[1]);if(arr[0][1]===arr[1][1]){col=TIE;hk='tie';lab='Tied';}else{const pc={D:'B',R:'R',O:'Y'}[arr[0][0]];const b=binS(arr[0][1],arr[1][1],t);col=RAMP8[pc][b];hk=pc+b;lab=LABS()[b];}
+          if(unc){h={D:'#416fcd',R:'#d02823',O:'#a88600',P:'#7048a6'}[unc];col=RAMP8[{D:'B',R:'R',O:'Y',P:'P'}[unc]][3];hk='U'+unc;lab='Uncontested';}}
+        else{if(tie){col=TIE;hk='tie';lab='Tied';}else{const pc=PLC[Math.min(mi,3)];const b=binS(m,sec2(c,i),t);col=RAMP8[pc][b];hk=pc+b;lab=LABS()[b];}}
+        V.set(c.s[i],{col,h,hk,lab});}
+      const keys=[...V.keys()];if(!keys.length)continue;const gf=[];const b=D.bb;
+      for(let i=0;i<base.paths.length;i++){if(V.has(i))continue;const sb=base.bb[i];if(sb[2]<b[0]||sb[0]>b[2]||sb[3]<b[1]||sb[1]>b[3])continue;const cc=base.cen[i];let best=null,bd=1e30,same=false;
+        for(const k of keys){const G=Gs[Math.floor(k/K)],d=G.cen[k%K],sc=G.cty[k%K]===base.cty[i],dd=(d[0]-cc[0])**2+(d[1]-cc[1])**2;if((sc&&!same)||(sc===same&&dd<bd)){bd=dd;best=k;same=sc;}}
+        const v=V.get(best);gf.push({p:base.paths[i],f:v.col,hatch:v.h});}
+      for(const k of keys){const G=Gs[Math.floor(k/K)],i=k%K,v=V.get(k);gf.push({p:G.paths[i],f:v.col,hatch:v.h});hits.push({p:G.paths[i],bb:G.bb[i],clip:D.path,html:tipFor(k,{c})});if(inC(k))addUse(v.hk,v.lab,v.col,v.h);}
+      groups.push({clip:D.path,fills:gf});}
+  }
+  if(!groups){for(const [i,src] of nf){const v=VAL.get(src);const p=base.paths[i];fills.push({p,f:v.col,hatch:v.h});}
+  for(const k of have){const G=Gs[Math.floor(k/K)],i=k%K;const v=VAL.get(k);fills.push({p:G.paths[i],f:v.col,hatch:v.h});hits.push({p:G.paths[i],bb:G.bb[i],html:tipFor(k,v.a||v)});if(inC(k))addUse(v.hk,v.lab,v.col,v.h);}}
+  // order overlays above base
+  fills.sort((a,b)=>0);
+  let clip=null,dlines=[],bb=null,mask=null;
+  const one=contests.length===1&&!all?contests[0]:null;
+  if(PL){if(one&&(s.g==='ushouse'||s.g==='leg')){const D=PL.D[String(one.d)];if(D){clip=D.path;dlines=[D.path];bb=D.bb;}}else{dlines=Object.values(PL.D).map(x=>x.path);}}
+  if(!bb){let x0=1e12,y0=1e12,x1=-1e12,y1=-1e12;for(const k of have){const b=Gs[Math.floor(k/K)].bb[k%K];x0=Math.min(x0,b[0]);y0=Math.min(y0,b[1]);x1=Math.max(x1,b[2]);y1=Math.max(y1,b[3]);}bb=[x0,y0,x1,y1];
+    if(!one||!(s.g==='ushouse'||s.g==='leg'||(SUBG(s.g)&&one.o!=='supreme'&&one.o!=='coa')))bb=STATEBB;}
+  let cityLine=null;if(one&&one.o==='mayor'){const C=await cityShape(one.d);if(C){clip=C.path;bb=C.bb;cityLine=C.path;}}   // mayoral races: cropped to the city limits
+  let labels=PL?distLabels(PL,one?[String(one.d)]:Object.keys(PL.D)):[];
+  {const ov=resolvePlan();if(ov===null){dlines=[];labels=[];}else if(ov!==pid){const OP=await plan(ov);dlines=Object.values(OP.D).map(x=>x.path);labels=distLabels(OP,Object.keys(OP.D));}}
+  // ---- crop a statewide race to one district of the chosen lines
+  let CROP=null;
+  if(OPT.crop&&cropAllowed()&&!all){const ov=resolvePlan();if(ov){const OP=await plan(ov);const D=OP.D[OPT.crop];if(D){
+    clip=D.path;bb=D.bb;dlines=[D.path];labels=distLabels(OP,[OPT.crop]);
+    const c=contests[0],n=c.c.length;const M=new Map();for(let i=0;i<c.s.length;i++){const o={};for(let j=0;j<n;j++)o[j]=c.v[i*n+j];M.set(c.s[i],o);}
+    const M26=await to2026({sets,M});const g26=await geo('2026');const tot=new Array(n).fill(0),CA={};
+    for(const [j,v] of M26){const as=OP.a26[j];if(!as)continue;if(CC&&g26.cty[j]!==CC)continue;let w=0;for(const [d,x] of as)if(String(d)===OPT.crop)w+=x;if(!w)continue;const cy=g26.cty[j];const o=CA[cy]||(CA[cy]=new Array(n).fill(0));for(let q=0;q<n;q++){const x=(v[q]||0)*w;tot[q]+=x;o[q]+=x;}}
+    CROP={OP,d:OPT.crop,tot,CA};
+    // legend: only the shades used inside the district
+    if(!groups){const oc=document.createElement('canvas').getContext('2d');const b=D.bb;usedL.clear();
+      for(const k of have){const G=Gs[Math.floor(k/K)],i=k%K,pb=G.bb[i];if(pb[2]<b[0]||pb[0]>b[2]||pb[3]<b[1]||pb[1]>b[3])continue;const c0=G.cen[i];
+        let inside=oc.isPointInPath(D.path,c0[0],c0[1]);if(!inside){const m=[(pb[0]+pb[2])/2,(pb[1]+pb[3])/2];inside=oc.isPointInPath(D.path,m[0],m[1]);}
+        if(inside&&inC(k)){const v=VAL.get(k);addUse(v.hk,v.lab,v.col,v.h);}}}}}}
+  // ---- results by county (votes cast in this race's precincts in each county)
+  const noCounty=all&&!isGen;let ctyRows=[];
+  if(!noCounty){const single=contests.length===1;const c0=contests[0];const PK=['D','R','O'];
+    const names=single?c0.c.map((n,j)=>n+(isGen&&!REG&&c0.cp[j]?` (${c0.cp[j][0]})`:'')):['Democratic','Republican','Other'];
+    const keyOf=single?(isGen?c0.cp.map(p=>({D:'B',R:'R',O:'Y'})[partyKey(p)]):primColors(c0)):['B','R','Y'];
+    const CA=CROP?CROP.CA:{};
+    if(!CROP)for(const c of contests){const n=c.c.length,pk=c.cp.map(partyKey);for(let i=0;i<c.s.length;i++){const k=c.s[i];const cy=Gs[Math.floor(k/K)].cty[k%K];const o=CA[cy]||(CA[cy]=new Array(names.length).fill(0));
+      for(let j=0;j<n;j++)o[single?j:PK.indexOf(pk[j])]+=c.v[i*n+j];}}
+    const unc=single&&isGen?contestUncontested(c0):null;
+    for(const cy of Object.keys(CA).sort()){const v=CA[cy],t=v.reduce((a,b)=>a+b,0);if(t<=0)continue;const ord=v.map((x,j)=>j).sort((a,b)=>v[b]-v[a]);const w=ord[0],r=ord[1];const sec=r!==undefined?v[r]:0;
+      let col,hk,lab,h=null;if(r!==undefined&&v[w]===sec){col=TIE;hk='tie';lab='Tied';}else{const b=binS(v[w],sec,t);col=RAMP8[keyOf[w]][b];hk=keyOf[w]+b;lab=LABS()[b];}
+      if(unc){h={D:'#416fcd',R:'#d02823',O:'#a88600',P:'#7048a6'}[unc];col=RAMP8[{D:'B',R:'R',O:'Y',P:'P'}[unc]][3];hk='U'+unc;lab='Uncontested';}
+      ctyRows.push({cy,v,t,w,sec,col,h,hk,lab,names,keyOf});}
+    if(CC)ctyRows=ctyRows.filter(R=>R.cy===CC);
+    if(LVL==='county'){fills.length=0;hits.length=0;groups=null;usedL.clear();
+      for(const R of ctyRows){const p=COUNTY[R.cy];if(!p)continue;fills.push({p,f:R.col,hatch:R.h,stroke:R.col});addUse(R.hk,R.lab,R.col,R.h);
+        hits.push({p,bb:COUNTYBB[R.cy],html:()=>{let h=`<b>${titleCase(R.cy)} County</b><table>`;R.v.map((x,j)=>[j,x]).sort((a,b)=>b[1]-a[1]).filter(z=>z[1]>0).slice(0,6).forEach(([j,x])=>h+=`<tr><td>${esc(R.names[j])}</td><td class="n">${fmt(x)}</td><td class="n">${pct(x/R.t)}</td></tr>`);return h+'</table>';}});}}}
+  renderCounties(ctyRows,noCounty);
+  if(CC&&COUNTY[CC]&&!CROP)bb=COUNTYBB[CC];
+  if(cityLine)dlines=dlines.concat([cityLine]);
+  LAYERS={fills,groups,hits,clip,clip2:CC?COUNTY[CC]:null,dlines,labels,dw:one||CROP?2:1.2,counties:countyPaths(),mask:STATEMASK,noCounty,cropped:!!CROP||!!cityLine};
+  fit(bb,CC?0.05:(one&&(s.g==='ushouse'||s.g==='leg'||SUBG(s.g)))||CROP?0.05:0.02);draw();
+  // legend
+  const lg=document.getElementById('legend');lg.innerHTML='';
+  if(isGen){const groups=REG?[['B','Democrats'],['R','Republicans'],['Y','Unaffiliated and other']]:[['B','Democratic'],['R','Republican'],['Y','Other']];for(const [pc,nm] of groups){const it=[];for(let b=7;b>=0;b--)if(usedL.has(pc+b))it.push([RAMP8[pc][b],LABS()[b]]);if(it.length)lg.appendChild(legendBlock(nm+(REG?' largest':' ahead'),it));}
+    const ex=[];for(const u of ['UD','UR','UO','UP'])if(usedL.has(u)){const v=usedL.get(u);ex.push([v[0],{UD:'Uncontested (Democratic)',UR:'Uncontested (Republican)',UO:'Uncontested (other)',UP:'Uncontested (both parties seated)'}[u],v[2]]);}
+    if(usedL.has('tie'))ex.push([TIE,'Tied']);if(ex.length)lg.appendChild(legendBlock('Other',ex));}
+  else if(one){const cc=primColors(one);const ordL=one.c.map((_,j)=>j);if(one.da!=null){ordL.sort((a,b)=>(a===one.da?-1:b===one.da?1:a-b));}ordL.map(j=>[one.c[j],j]).forEach(([nm,j])=>{const it=[];for(let b=7;b>=0;b--)if(usedL.has(cc[j]+b))it.push([RAMP8[cc[j]][b],LABS()[b]]);if(it.length)lg.appendChild(legendBlock(nm+(REG?' largest':' ahead'),it));});if(usedL.has('tie'))lg.appendChild(legendBlock('Other',[[TIE,'Tied']]));}
+  else{const PLC=['B','R','G','X'],PN=['District winner ahead','Runner-up ahead','Third place ahead','Fourth place or lower ahead'];PLC.forEach((pc,j)=>{const it=[];for(let b=7;b>=0;b--)if(usedL.has(pc+b))it.push([RAMP8[pc][b],LABS()[b]]);if(it.length)lg.appendChild(legendBlock(PN[j],it));});if(usedL.has('tie'))lg.appendChild(legendBlock('Other',[[TIE,'Tied']]));}
+  // head + results
+  const offn=s.g==='leg'||s.g==='cos'||SUBG(s.g)?OFFN[s.o]:OFFN[s.g];
+  const stage=REG?'':stageText(e,sx.one?sx.one.p:sx.all[0].p);
+  setHead(SUBG(s.g)?(one?`${raceTitle(one)}, ${stage}`:`${offn}, ${stage} — all counties`):one&&(s.g==='ushouse'||s.g==='leg')?`${offn} District ${one.d}, ${stage}`:`${offn}, ${stage}${all?' — all districts':''}`,
+    (LVL==='county'&&!noCounty?(isGen?'County winner by party, shaded by the winner’s share of the vote':'County leader, shaded by the leader’s share of the vote'):isGen?'Precinct winner by party, shaded by the winner’s share of the vote':all?(SUBG(s.g)?'Precinct leader by finishing place in its county, shaded by the leader’s share':'Precinct leader by finishing place in its district, shaded by the leader’s share'):'Precinct leader, shaded by the leader’s share of the vote')+(all&&isGen?'; hatched: uncontested '+(SUBG(s.g)?'races':'districts'):'')+'. '+e.date+'.'+(one&&one.da!=null?' Teal marks the candidate whose support tracks the Democratic vote, orange the other leading candidate.':''));
+  setNote(LINES_NOTE(sets)+(PL?`; black lines: districts used in ${PL.yrs} (${PL.name})`:(s.g==='ushouse'&&e.year<2012?'; no district plan file for this year, so districts are not outlined':''))+'. '+(all&&isGen?(PL?'Each district shows its own race, so precincts split between districts are divided along the district lines. ':'')+'Each party’s votes are combined across candidates (multi-member districts included). ':'')+poolNote(e)+(e.year===2000?NOTE2000:'')+(one&&one.o==='mayor'?' Cropped to the city limits from the 2020 Census; precincts are shown only where they fall inside them.':''));
+  if(REG){const c=contests[0],cty=sets[0]==='cty';const what=({party:'party',dr:'party, Democrats vs. Republicans',race:'race and ethnicity'})[c.o];
+    setHead(`Voter registration by ${what}, ${e.date}`,(LVL==='county'||cty?'Largest group in each county':'Largest group in each precinct')+', shaded by its share of registered voters.');
+    setNote((cty?'2000 registration is available by county only. ':LINES_NOTE(sets)+(PL?`; black lines: districts used in ${PL.yrs} (${PL.name})`:'')+'. ')+'Registered voters, active and inactive, on '+e.date+'. Voters with no precinct listed are left out.'+(c.o==='race'?' Hispanic/Latino counts anyone with a Hispanic ethnicity code, of any race; the other groups are non-Hispanic.':''));}
+  if(CC){document.getElementById('title').textContent+=` — ${titleCase(CC)} County`;document.getElementById('subtitle').textContent+=` Cropped to ${titleCase(CC)} County.`;}
+  if(CC&&!CROP){const inCty=c=>{const n=c.c.length,t=new Array(n).fill(0);let any=false;for(let i=0;i<c.s.length;i++){if(!inC(c.s[i]))continue;any=true;for(let j=0;j<n;j++)t[j]+=c.v[i*n+j];}return any?t:null;};
+    const L=[];for(const c of contests){const t=inCty(c);if(!t)continue;const ord=c.c.map((x,j)=>j).filter(j=>t[j]>0).sort((a,b)=>t[b]-t[a]);L.push({...c,c:ord.map(j=>c.c[j]),cp:ord.map(j=>c.cp[j]),t:ord.map(j=>t[j]),un:0,da:c.da!=null?ord.indexOf(c.da):null,_full:c});}
+    if(!L.length){document.getElementById('results').innerHTML='<div class="muted" style="font-size:.8rem">This race has no precincts in this county.</div>';setStatus('');return;}
+    renderResults(all?L.map(x=>x._full):[L[0]],isGen,all,s);const box=document.getElementById('results');
+    if(!all){const T=L[0].t.reduce((a,b)=>a+b,0),ST=contests[0].t.reduce((a,b)=>a+b,0);box.insertBefore(el('div',{class:'muted',style:'font-size:.76rem;margin-bottom:6px',text:`In ${titleCase(CC)} County's precincts: ${fmt(T)} of ${fmt(ST)} votes.`}),box.firstChild);}
+    document.getElementById('res-h').textContent=all?'Races in county (full results)':'Results in county';setStatus('');return;}
+  if(CROP){const chn={house:'State House',senate:'State Senate',congress:'Congressional'}[CROP.OP.chamber];
+    const t=document.getElementById('title');t.textContent+=` — ${chn} District ${CROP.d}`;
+    document.getElementById('subtitle').textContent+=` Cropped to ${chn} District ${CROP.d} (${CROP.OP.yrs} lines).`;
+    document.getElementById('note').textContent+=' District totals: results are spread onto 2020 census blocks by voting-age population and re-added within the district, so precincts split by the district line count only their part inside it.';
+    const c=contests[0];const ord=c.c.map((x,j)=>j).filter(j=>CROP.tot[j]>=0.5).sort((a,b)=>CROP.tot[b]-CROP.tot[a]);renderResults([{...c,c:ord.map(j=>c.c[j]),cp:ord.map(j=>c.cp[j]),t:ord.map(j=>Math.round(CROP.tot[j])),un:0,vf:1}],isGen,false,s);
+    const box=document.getElementById('results');const T=CROP.tot.reduce((a,b)=>a+b,0),ST=c.t.reduce((a,b)=>a+b,0);
+    box.insertBefore(el('div',{class:'muted',style:'font-size:.76rem;margin-bottom:6px',text:`Inside ${chn} District ${CROP.d}: ${fmt(T)} of ${fmt(ST)} statewide ${REG?'registered voters':'votes'}.`}),box.firstChild);
+    document.getElementById('res-h').textContent='Results in district';setStatus('');return;}
+  renderResults(contests,isGen,all,s);setStatus('');
+}
+function renderCounties(rows,off){const box=document.getElementById('ctyres');box.innerHTML='';
+  if(off||!rows.length){box.appendChild(el('div',{class:'muted',style:'font-size:.8rem',text:off?'Pick one district to see its results by county.':'No county results.'}));return;}
+  const tb=el('table',{class:'res'});tb.innerHTML='<tr><th>County</th><th>Leader</th><th class="n">Share</th><th class="n">Margin</th></tr>';
+  for(const R of rows){const tr=el('tr');tr.innerHTML=`<td>${esc(titleCase(R.cy))}</td><td><span class="dot" style="background:${PCOL[R.keyOf[R.w]]}"></span>${esc(R.names[R.w])}</td><td class="n">${pct(R.v[R.w]/R.t)}</td><td class="n">${R.sec===0&&R.v.filter(x=>x>0).length<2?'unopp.':'+'+((R.v[R.w]-R.sec)/R.t*100).toFixed(1)}</td>`;tb.appendChild(tr);}
+  box.appendChild(tb);}
+function contestName(c){if(c.g==='courts'||c.g==='local')return raceTitle(c)+(c.note==='unexpired'?' (unexpired)':'');const o=c.o;let n=o==='house'||o==='senate'||o==='ushouse'?`${OFFN[o]} District ${c.d}`:OFFN[o];if(c.note==='unexpired')n+=' (unexpired)';return n;}
+function esc(s){return String(s).replace(/[&<>"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[m]));}
+function titleCase(s){return String(s||'').toLowerCase().replace(/\b([a-z])/g,m=>m.toUpperCase());}
+function renderResults(contests,isGen,all,s){
+  const box=document.getElementById('results');box.innerHTML='';document.getElementById('res-h').textContent='Results';
+  if(!all){const c=contests[0];const T=c.t.reduce((a,b)=>a+b,0);const tb=el('table',{class:'res'});tb.innerHTML='<tr><th>Candidate</th><th class="n">Votes</th><th class="n">Share</th></tr>';
+    const cc=isGen?null:null;c.c.forEach((nm,j)=>{const p=c.cp[j];const pk=partyKey(p);const col=isGen?{D:'#416fcd',R:'#d02823',O:'#a88600'}[pk]:PCOL[primColorsG(c)[j]];
+      const tr=el('tr');tr.innerHTML=`<td><span class="dot" style="background:${col}"></span>${esc(nm)}${isGen&&p&&c.g!=='reg'?` <span class="muted">(${esc(p)})</span>`:''}</td><td class="n">${fmt(c.t[j])}</td><td class="n">${pct(c.t[j]/T)}</td>`;tb.appendChild(tr);});
+    if(c.g==='reg')tb.querySelector('tr').innerHTML='<th>Group</th><th class="n">Voters</th><th class="n">Share</th>';
+    box.appendChild(tb);if(c.un>0)box.appendChild(el('div',{class:'muted',style:'font-size:.74rem;margin-top:6px',text:`${fmt(c.un)} ${c.g==='reg'?'registered voters':'votes'} could not be placed on a precinct; they are in the totals but not on the map.`}));if((c.vf||1)>1)box.appendChild(el('div',{class:'muted',style:'font-size:.74rem;margin-top:4px',text:`Vote for ${c.vf}.`}));return;}
+  // all districts: seats + table
+  let seats={D:0,R:0,O:0},votes={D:0,R:0,O:0};const rows=[];
+  for(const c of contests){const T=c.t.reduce((a,b)=>a+b,0);const vf=c.vf||1;const ord=c.c.map((n,j)=>j).sort((a,b)=>c.t[b]-c.t[a]);
+    if(isGen){ord.slice(0,vf).forEach(j=>seats[partyKey(c.cp[j])]++);c.cp.forEach((p,j)=>votes[partyKey(p)]+=c.t[j]);}
+    rows.push({c,T,w:ord[0],r:ord[1]});}
+  if(isGen){const d=el('div');d.innerHTML=`<div class="row" style="gap:14px;margin-bottom:8px"><span><span class="dot" style="background:#416fcd"></span><b>${seats.D}</b> Democratic</span><span><span class="dot" style="background:#d02823"></span><b>${seats.R}</b> Republican</span>${seats.O?`<span><span class="dot" style="background:#a88600"></span><b>${seats.O}</b> other</span>`:''}</div><div class="muted" style="font-size:.76rem;margin-bottom:6px">Votes: Dem ${fmt(votes.D)} · Rep ${fmt(votes.R)} · other ${fmt(votes.O)}</div>`;box.appendChild(d);}
+  const tb=el('table',{class:'res'});tb.innerHTML=`<tr><th>${SUBG(s.g)?'County':'Dist.'}</th><th>Winner</th><th class="n">Share</th><th class="n">Margin</th></tr>`;
+  rows.sort((a,b)=>natCmp(a.c.d,b.c.d)).forEach(({c,T,w,r})=>{const tr=el('tr');const pk=partyKey(c.cp[w]);const col=isGen?{D:'#416fcd',R:'#d02823',O:'#a88600'}[pk]:'#416fcd';const m=r!==undefined?(c.t[w]-c.t[r])/T:1;
+    tr.innerHTML=`<td>${c.d}</td><td><span class="dot" style="background:${col}"></span>${esc(c.c[w])}</td><td class="n">${pct(c.t[w]/T)}</td><td class="n">${r===undefined?'unopp.':'+'+(m*100).toFixed(1)}</td>`;tr.style.cursor='pointer';tr.title=SUBG(s.g)?'Show this county':'Show this district';
+    tr.onclick=()=>{PA.s.d=String(c.d);PA.fix();};tb.appendChild(tr);});
+  box.appendChild(tb);
+}
+// ---------- MODE 2: compare ----------
+async function perShape(sx,mode,candIdx){ // -> {sets, M: Map(key -> {a,b,t}) } a,b are numerators for metric
+  const contests=await getContests(sx);const isGen=genLike(sx.e,contests[0]);const M=new Map();
+  if(mode==='margin'){for(const [k,a] of shapeParty(contests)){const t=a.D+a.R+a.O;if(t>0)M.set(k,{D:a.D,R:a.R,T:t});}}
+  else{const c=contests[0];const n=c.c.length;const nw=c.c.map(x=>x!=='White'&&x!=='Undesignated');for(let i=0;i<c.s.length;i++){let t=0,x=0;for(let j=0;j<n;j++){const v=c.v[i*n+j];t+=v;if(nw[j])x+=v;}if(t>0)M.set(c.s[i],{X:candIdx===-1?x:c.v[i*n+candIdx],T:t});}}
+  return {sets:sx.e.sets,M,contests};}
+async function to2026(r){if(r.sets.length===1&&r.sets[0]==='2026')return r.M;const out=new Map();const XS=await Promise.all(r.sets.map(xw));
+  for(const [k,v] of r.M){const X=XS[Math.floor(k/K)];const L=X[k%K];if(!L)continue;for(const [j,w] of L){let o=out.get(j);if(!o){o={};out.set(j,o);}for(const f in v)o[f]=(o[f]||0)+v[f]*w;}}return out;}
+function canMargin(sx){return genLike(sx.e,sx.one?sx.one.c:null,false);}
+const RACEC={'White':'S','Black':'P','Hispanic/Latino':'O','Asian':'T','Other races':'N','Undesignated':'X'};
+function primColorsG(c){if(c.g==='reg')return c.c.map(n=>RACEC[n]||'X');
+  if(!c.p&&(c.cp||[]).some(p=>p))return splitColors(c);
+  if(!c.p&&c.da!=null&&c.c.length>=2&&!c.cp.some(p=>p)){const o=new Array(c.c.length);const ot=c.da===0?1:0;o[c.da]='T';o[ot]='O';const rest=['G','P','Y','K','S','N','L','X'];let q=0;for(let j=0;j<o.length;j++)if(!o[j])o[j]=rest[Math.min(q++,rest.length-1)];return o;}const PO={DEM:['B','G','Y','P','O','T','K','S','N','L','X'],REP:['R','G','Y','P','O','T','K','S','N','L','X'],'':['T','O','G','P','Y','K','S','N','L','X']};const base=PO[c.p]||PO[''];return c.c.map((n,j)=>base[Math.min(j,base.length-1)]);}
+function dupParty(c){const n={};for(const p of c.cp||[]){if(p==='DEM'||p==='REP'){n[p]=(n[p]||0)+1;if(n[p]>1)return true;}}return false;}
+function genLike(e,c,single){if(e.kind==='registration')return !!c&&c.o!=='race';if(e.kind!=='general'&&e.kind!=='municipal')return false;if(!c)return e.kind==='general';const cc=c.cp?c:c.c||c;
+  if(cc.p||!(cc.cp||[]).some(p=>p))return false;
+  if(single&&!OPT.combine&&(cc.vf||1)===1&&dupParty(cc))return false;   // e.g. 2018 Supreme Court: two Republicans shown separately unless combined
+  return true;}
+function splitColors(c){const L={DEM:['B','P','T'],REP:['R','O','K'],'':['Y','G','S','N','L','X']},q={DEM:0,REP:0,'':0};return c.cp.map(p=>{const k=p==='DEM'||p==='REP'?p:'';const a=L[k];return a[Math.min(q[k]++,a.length-1)];});}
+async function drawCompare(){
+  const A=PA.sel,B=PB.sel;setStatus('Loading…');
+  const mode=(canMargin(A)&&canMargin(B))?'margin':'share';
+  const [ca,cb]=await Promise.all([getContests(A),getContests(B)]);
+  renderCompareOpts(mode,ca,cb);
+  const ra=await perShape(A,mode,OPT.ca),rb=await perShape(B,mode,OPT.cb);
+  const same=JSON.stringify(ra.sets)===JSON.stringify(rb.sets);
+  let MA=ra.M,MB=rb.M,sets=ra.sets;if(!same){MA=await to2026(ra);MB=await to2026(rb);sets=['2026'];}
+  const Gs=await Promise.all(sets.map(geo));
+  const val=v=>mode==='margin'?(v.D-v.R)/v.T*100:v.X/v.T*100;
+  const tot=M=>{let s={D:0,R:0,X:0,T:0};for(const v of M.values())for(const f in v)s[f]+=v[f];return s;};
+  // overall values within the common area
+  const keys=[...MA.keys()].filter(k=>MB.has(k)&&MA.get(k).T>0.5&&MB.get(k).T>0.5);
+  const subA={D:0,R:0,X:0,T:0},subB={D:0,R:0,X:0,T:0};for(const k of keys){const a=MA.get(k),b=MB.get(k);for(const f in a)subA[f]+=a[f];for(const f in b)subB[f]+=b[f];}
+  const OA=val(subA),OB=val(subB),dO=OB-OA;
+  const trend=OPT.trend==='trend';
+  const EDG=OPT.bins==='wide'?[5,10,20,30,40]:[2.5,5,10,15,20];const LB=[`Under ${EDG[0]}`].concat(EDG.slice(0,-1).map((e,i)=>`${e}–${EDG[i+1]}`),[`${EDG[4]}+`]);
+  const sameYear=A.e.year===B.e.year;const pal=mode==='share'?DIV.TO:sameYear?DIV.PG:DIV.BR;
+  const fills=[],hits=[],used=new Set();const VAL=new Map();
+  for(const k of keys){let d=val(MB.get(k))-val(MA.get(k));if(trend)d-=dO;const b=EDG.filter(e=>Math.abs(d)>=e).length;const col=Math.abs(d)<1e-9?NOTE_GRAY:(d>0?pal.pos:pal.neg)[b];used.add((d>0?'p':'n')+b);VAL.set(k,{d,col});}
+  const base=Gs[0];const want=[];for(let i=0;i<base.paths.length;i++)if(!VAL.has(i))want.push(i);
+  const ctySet=new Set(keys.map(k=>Gs[Math.floor(k/K)].cty[k%K]));
+  for(const [i,src] of nearestFill(base,want,keys,null,0,ctySet))fills.push({p:base.paths[i],f:VAL.get(src).col});
+  const nA=labelOf(PA),nB=labelOf(PB);
+  for(const k of keys){const G=Gs[Math.floor(k/K)],i=k%K,v=VAL.get(k);fills.push({p:G.paths[i],f:v.col});
+    hits.push({p:G.paths[i],bb:G.bb[i],html:()=>{const a=MA.get(k),b=MB.get(k);const fa=mode==='margin'?mg(val(a)):val(a).toFixed(1)+'%',fb=mode==='margin'?mg(val(b)):val(b).toFixed(1)+'%';
+      return `<b>${titleCase(G.name[i]||G.code[i])}</b><div class="muted">${titleCase(G.cty[i])} County</div><table><tr><td>${esc(nA)}</td><td class="n">${fa}</td></tr><tr><td>${esc(nB)}</td><td class="n">${fb}</td></tr><tr><td>${trend?'Change vs. overall':'Change'}</td><td class="n"><b>${(v.d>=0?'+':'')+v.d.toFixed(1)}</b></td></tr></table>`;}});}
+  // clip to a single district of B if any
+  let clip=null,dlines=[],bb=STATEBB;
+  const one=B.one&&(PB.s.g==='ushouse'||PB.s.g==='leg')?B.one:(A.one&&(PA.s.g==='ushouse'||PA.s.g==='leg')?A.one:null);
+  if(one){const P=one===B.one?PB:PA;const pid=P.s.g==='ushouse'?IDX.planyr.ushouse[P.sel.e.year]:IDX.planyr[P.s.o][P.sel.e.year];if(pid){const PL=await plan(pid);const D=PL.D[String(one.d)];if(D){clip=D.path;dlines=[D.path];bb=D.bb;}}
+    if(bb===STATEBB){let x0=1e12,y0=1e12,x1=-1e12,y1=-1e12;for(const k of keys){const b=Gs[Math.floor(k/K)].bb[k%K];x0=Math.min(x0,b[0]);y0=Math.min(y0,b[1]);x1=Math.max(x1,b[2]);y1=Math.max(y1,b[3]);}bb=[x0,y0,x1,y1];}}
+  let labels=[];{const ov=resolvePlan();const own=ownPlanOf(PB);if(ov===null){dlines=[];}else if(!(one&&ov===own)){const OP=await plan(ov);dlines=Object.values(OP.D).map(x=>x.path);labels=distLabels(OP,Object.keys(OP.D));}else{const OP=await plan(ov);labels=distLabels(OP,[String(one.d)]);}}
+  // ---- counties
+  const CA={};for(const k of keys){const cy=Gs[Math.floor(k/K)].cty[k%K];const o=CA[cy]||(CA[cy]={a:{D:0,R:0,X:0,T:0},b:{D:0,R:0,X:0,T:0}});const a=MA.get(k),b=MB.get(k);for(const f in a)o.a[f]+=a[f];for(const f in b)o.b[f]+=b[f];}
+  const crow=Object.keys(CA).sort().map(cy=>{const o=CA[cy];let d=val(o.b)-val(o.a);if(trend)d-=dO;return {cy,va:val(o.a),vb:val(o.b),d};});
+  if(LVL==='county'){fills.length=0;hits.length=0;used.clear();
+    for(const R of crow){const p=COUNTY[R.cy];if(!p)continue;const b=EDG.filter(e=>Math.abs(R.d)>=e).length;const col=Math.abs(R.d)<1e-9?NOTE_GRAY:(R.d>0?pal.pos:pal.neg)[b];used.add((R.d>0?'p':'n')+b);fills.push({p,f:col,stroke:col});
+      hits.push({p,bb:COUNTYBB[R.cy],html:()=>`<b>${titleCase(R.cy)} County</b><table><tr><td>${esc(nA)}</td><td class="n">${mode==='margin'?mg(R.va):R.va.toFixed(1)+'%'}</td></tr><tr><td>${esc(nB)}</td><td class="n">${mode==='margin'?mg(R.vb):R.vb.toFixed(1)+'%'}</td></tr><tr><td>${trend?'Change vs. overall':'Change'}</td><td class="n"><b>${(R.d>=0?'+':'')+R.d.toFixed(1)}</b></td></tr></table>`});}}
+  {const box=document.getElementById('ctyres');box.innerHTML='';const tb=el('table',{class:'res'});tb.innerHTML=`<tr><th>County</th><th class="n">From</th><th class="n">To</th><th class="n">${trend?'vs. overall':'Change'}</th></tr>`;
+    const f=x=>mode==='margin'?mg(x):x.toFixed(1)+'%';for(const R of crow){const tr=el('tr');tr.innerHTML=`<td>${esc(titleCase(R.cy))}</td><td class="n">${f(R.va)}</td><td class="n">${f(R.vb)}</td><td class="n">${(R.d>=0?'+':'')+R.d.toFixed(1)}</td>`;tb.appendChild(tr);}box.appendChild(tb);}
+  LAYERS={fills,hits,clip,dlines,labels,dw:2,counties:countyPaths(),mask:STATEMASK};fit(bb,0.03);draw();
+  const lg=document.getElementById('legend');lg.innerHTML='';
+  const posL=mode==='share'?`Higher in ${nB}`:sameYear?`More Democratic in ${nB}`:(trend?'More Democratic than overall':'Toward Democrats');
+  const negL=mode==='share'?`Lower in ${nB}`:sameYear?`More Republican in ${nB}`:(trend?'More Republican than overall':'Toward Republicans');
+  for(const [s,nm,arr] of [['p',posL,pal.pos],['n',negL,pal.neg]]){const it=[];for(let b=5;b>=0;b--)if(used.has(s+b))it.push([arr[b],LB[b]+' pts']);if(it.length)lg.appendChild(legendBlock(nm,it));}
+  const what=mode==='margin'?'Democratic margin':`${esc(ca[0].c[OPT.ca])}’s share (A) vs. ${esc(cb[0].c[OPT.cb])}’s share (B)`;
+  setHead(`${nA} → ${nB}`,(mode==='margin'?'Change in Democratic margin':(A.e.kind==='registration'&&B.e.kind==='registration'?'Change in share of registered voters':'Change in vote share'))+(trend?', relative to the change across the mapped area':'')+(LVL==='county'?', by county.':', by precinct.'));
+  setNote((same?LINES_NOTE(sets):'Both elections shown on the 2026 precinct lines; results from other years are spread onto 2020 census blocks by voting-age population and re-added into 2026 precincts')+'. Only precincts with votes or registered voters in both are compared. '+(sameYear&&mode==='margin'?'Same-year comparison: purple/green. ':'')+(A.e.kind==='registration'&&B.e.kind==='registration'?'Registration margins are each party’s share of all registered voters.':POOL_NOTE));
+  const box=document.getElementById('results');box.innerHTML='';document.getElementById('res-h').textContent='Comparison';
+  const f=x=>mode==='margin'?mg(x):x.toFixed(1)+'%';
+  box.innerHTML=`<table class="res"><tr><th>Election</th><th class="n">${mode==='margin'?'Margin':'Share'}</th></tr><tr><td>A · ${esc(nA)}</td><td class="n">${f(OA)}</td></tr><tr><td>B · ${esc(nB)}</td><td class="n">${f(OB)}</td></tr><tr><td><b>Change</b></td><td class="n"><b>${(dO>=0?'+':'')+dO.toFixed(1)} pts</b></td></tr></table><div class="muted" style="font-size:.74rem;margin-top:6px">Totals cover the ${fmt(keys.length)} precincts mapped in both elections.</div>`;
+  setStatus('');
+}
+function mg(x){return (x>=0?'D+':'R+')+Math.abs(x).toFixed(1);}
+function labelOf(P){const s=P.s,sx=P.sel,e=sx.e;if(SUBG(s.g)){const c=sx.one?sx.one.c:null;return `${e.year} ${c?raceTitle(c):OFFN[s.o]}${e.kind==='general'?'':' '+stageText(e,sx.one?sx.one.p:sx.all[0].p).replace(/^\d{4} /,'')}`;}if(s.g==='reg')return `${e.year} ${({race:'registration by race',dr:'D vs. R registration',party:'party registration'})[sx.one?sx.one.c.o:'party']}`;const off=s.g==='leg'||s.g==='cos'?OFFN[s.o]:OFFN[s.g];const d=sx.one&&(s.g==='ushouse'||s.g==='leg')?` ${sx.one.d}`:'';const st=e.kind==='general'?'':` ${(PARTYNAME[sx.one?sx.one.p:sx.all[0].p]||'').replace('Democratic','Dem.').replace('Republican','Rep.')} ${e.kind}`;return `${e.year} ${off}${d}${st}`;}
+function renderCompareOpts(mode,ca,cb){
+  const box=document.getElementById('opts');box.innerHTML='';document.getElementById('cardOpt').classList.remove('hide');document.getElementById('opt-h').textContent='Comparison options';
+  const add=(lab,node)=>{box.appendChild(el('label',{for:node.id,text:lab}));box.appendChild(node);};
+  if(mode==='share'&&!OPT.picked){OPT.ca=0;const nm=ca[0].c[0];let j=cb[0].c.indexOf(nm);if(j<0){const pa=ca[0].p||ca[0].cp[0]||'';j=cb[0].cp.findIndex(p=>(p||'').toUpperCase()===pa.toUpperCase());}OPT.cb=Math.max(0,j);}
+  if(mode==='share'){if(OPT.ca>=ca[0].c.length||(OPT.ca<0&&ca[0].o!=='race'))OPT.ca=0;if(OPT.cb>=cb[0].c.length||(OPT.cb<0&&cb[0].o!=='race'))OPT.cb=0;const opt=c=>c.c.map((n,i)=>[i,n]).concat(c.g==='reg'&&c.o==='race'&&c.c.length>2?[[-1,'Non-white']]:[]);const a=sel('o-ca',opt(ca[0]),OPT.ca),b=sel('o-cb',opt(cb[0]),OPT.cb);add(ca[0].g==='reg'?'Group A':'Candidate A',a);add(cb[0].g==='reg'?'Group B':'Candidate B',b);a.onchange=()=>{OPT.ca=+a.value;OPT.picked=true;refresh();};b.onchange=()=>{OPT.cb=+b.value;OPT.picked=true;refresh();};}
+  const t=sel('o-tr',[['swing','Change'],['trend','Change relative to overall']],OPT.trend);add('Show',t);t.onchange=()=>{OPT.trend=t.value;refresh();};
+  const bn=sel('o-bins',[['narrow','2.5 to 20 points'],['wide','5 to 40 points']],OPT.bins);add('Buckets',bn);bn.onchange=()=>{OPT.bins=bn.value;refresh();};
+  if(mode==='share')box.appendChild(el('div',{class:'muted',style:'grid-column:1/-1;font-size:.74rem',text:(ca[0].g==='reg'||cb[0].g==='reg')&&(ca[0].o==='race'||cb[0].o==='race')?'Race comparisons show one group’s share of registered voters in each. Non-white is every group except White and Undesignated.':'A primary is involved, so the map compares one candidate’s share in each election.'}));
+}
+// ---------- MODE 3: on district lines ----------
+async function drawDistricts(){
+  const A=PA.sel;setStatus('Loading…');
+  document.getElementById('cardOpt').classList.add('hide');syncOvl();
+  const PL=await plan(resolvePlan());const contests=await getContests(A);const isGen=genLike(A.e,contests[0]);
+  // per shape vector of candidate (or party) votes
+  const groups=isGen?['D','R','O']:contests[0].c.map((n,i)=>i);
+  const M=new Map();
+  if(isGen){for(const [k,a] of shapeParty(contests))M.set(k,{D:a.D,R:a.R,O:a.O});}else{const c=contests[0],n=c.c.length;for(let i=0;i<c.s.length;i++){const o={};for(let j=0;j<n;j++)o[j]=c.v[i*n+j];M.set(c.s[i],o);}}
+  // a district race shown on its own lines: each district gets its own race's official totals (no geographic re-tally)
+  const exact=A.e.kind!=='registration'&&contests.every(c=>c.d!=null&&c.d!=='')&&LASTPLAN&&LASTPLAN===ownPlanOf(PA);
+  const DV={};
+  if(exact){for(const c of contests){let o=DV[c.d];if(!o){o={};groups.forEach(g=>o[g]=0);DV[c.d]=o;}const pk=c.cp.map(partyKey);c.t.forEach((v,j)=>{o[isGen?pk[j]:j]+=v;});}}
+  else{const M26=await to2026({sets:A.e.sets,M});for(const [j,v] of M26){const as=PL.a26[j];if(!as)continue;for(const [d,w] of as){let o=DV[d];if(!o){o={};groups.forEach(g=>o[g]=0);DV[d]=o;}for(const g of groups)o[g]+=(v[g]||0)*w;}}}
+  const fills=[],hits=[],labels=[],used=new Set();const rows=[];let seats={};
+  const colOf=(g)=>isGen?{D:'B',R:'R',O:'Y'}[g]:primColorsG(contests[0])[g];
+  const name=g=>isGen?{D:'Democratic',R:'Republican',O:'Other'}[g]:contests[0].c[g];
+  for(const d in PL.D){const D=PL.D[d],v=DV[d];let col=NODATA,txt=null,dark=false;
+    if(v){const T=groups.reduce((s,g)=>s+v[g],0);if(T>0){const ord=[...groups].sort((a,b)=>v[b]-v[a]);const w=ord[0],sh=v[w]/T;const b=binS(v[w],ord[1]!==undefined?v[ord[1]]:0,T);const pc=colOf(w);col=RAMP8[pc][b];dark=b>=5;used.add(pc+'|'+b+'|'+w);seats[w]=(seats[w]||0)+1;
+      rows.push({d:+d,w,sh,m:(v[w]-(ord[1]!==undefined?v[ord[1]]:0))/T,T,v});}}
+    fills.push({p:D.path,f:col,stroke:'#000'});hits.push({p:D.path,bb:D.bb,html:()=>{const r=rows.find(x=>x.d===+d);if(!r)return `<b>District ${d}</b><div class="muted">No votes from this election</div>`;let h=`<b>District ${d}</b><table>`;[...groups].sort((a,b)=>r.v[b]-r.v[a]).slice(0,6).forEach(g=>h+=`<tr><td>${esc(name(g))}</td><td class="n">${fmt(r.v[g])}</td><td class="n">${pct(r.v[g]/r.T)}</td></tr>`);return h+'</table>';}});
+    if(!D.lab)D.lab=poleish(D.big);labels.push({x:D.lab[0],y:D.lab[1],t:d,dark});}
+  LAYERS={fills,hits,labels,dlines:Object.values(PL.D).map(x=>x.path),dw:1.1,counties:countyPaths(),mask:STATEMASK};
+  fit(STATEBB,0.02);draw();
+  const lg=document.getElementById('legend');lg.innerHTML='';
+  for(const g of groups){const it=[];for(let b=7;b>=0;b--)if(used.has(colOf(g)+'|'+b+'|'+g))it.push([RAMP8[colOf(g)][b],LABS()[b]]);if(it.length)lg.appendChild(legendBlock(name(g)+' ahead',it));}
+  if(Object.keys(PL.D).some(d=>!DV[d]))lg.appendChild(legendBlock('Other',[[NODATA,'No votes from this election']]));
+  const nA=labelOf(PA);setHead(`${nA} on the ${PL.yrs} ${({house:'state house',senate:'state senate',congress:'congressional'})[PL.chamber]} districts`,(A.e.kind==='registration'?'Largest group in each district, shaded by its share of registered voters.':'District winner, shaded by the winner’s share of the vote.'));
+  setNote(exact?`Each district shows its own race's official totals, including votes that could not be placed in a precinct. Districts are cropped to the county shoreline.`:`Precinct results are spread onto 2020 census blocks by voting-age population and re-added into each district (via the 2026 precinct lines); each block goes to the district containing its interior point. Districts are cropped to the county shoreline. `+(A.e.kind==='registration'?'Registered voters, active and inactive, on '+A.e.date+'.':POOL_NOTE.split('. ')[0]+'.'));
+  const box=document.getElementById('results');box.innerHTML='';document.getElementById('res-h').textContent='Districts';
+  const sm=el('div',{class:'row',style:'gap:14px;margin-bottom:8px'});for(const g of groups)if(seats[g])sm.appendChild(el('span',{html:`<span class="dot" style="background:${PCOL[colOf(g)]}"></span><b>${seats[g]}</b> ${esc(name(g))}`}));box.appendChild(sm);
+  const tb=el('table',{class:'res'});tb.innerHTML='<tr><th>Dist.</th><th>Leader</th><th class="n">Share</th><th class="n">Margin</th></tr>';
+  rows.sort((a,b)=>a.d-b.d).forEach(r=>{const tr=el('tr');tr.innerHTML=`<td>${r.d}</td><td><span class="dot" style="background:${PCOL[colOf(r.w)]}"></span>${esc(name(r.w))}</td><td class="n">${pct(r.sh)}</td><td class="n">+${(r.m*100).toFixed(1)}</td>`;tb.appendChild(tr);});box.appendChild(tb);
+  setStatus('');
+}
+function poleish(r){ // a point well inside the ring: grid search for the cell farthest from the edge
+  let x0=1e12,y0=1e12,x1=-1e12,y1=-1e12;for(const [x,y] of r){x0=Math.min(x0,x);x1=Math.max(x1,x);y0=Math.min(y0,y);y1=Math.max(y1,y);}
+  const p=new Path2D();r.forEach((pt,i)=>i?p.lineTo(pt[0],pt[1]):p.moveTo(pt[0],pt[1]));
+  const oc=document.createElement('canvas').getContext('2d');let best=[(x0+x1)/2,(y0+y1)/2],bd=-1;const N=32;
+  for(let i=1;i<N;i++)for(let j=1;j<N;j++){const x=x0+(x1-x0)*i/N,y=y0+(y1-y0)*j/N;if(!oc.isPointInPath(p,x,y))continue;let m=1e30;for(let k=0;k<r.length;k+=Math.max(1,Math.floor(r.length/600))){const dd=(r[k][0]-x)**2+(r[k][1]-y)**2;if(dd<m)m=dd;}if(m>bd){bd=m;best=[x,y];}}
+  return best;}
+function renderPlanOpts(){const box=document.getElementById('opts');box.innerHTML='';document.getElementById('cardOpt').classList.remove('hide');document.getElementById('opt-h').textContent='District lines';
+  const ch={congress:'Congress',senate:'State Senate',house:'State House'};const ops=IDX.plans.slice().sort((a,b)=>a.chamber.localeCompare(b.chamber)||b.id.localeCompare(a.id)).map(p=>[p.id,`${ch[p.chamber]} ${p.yrs} (${p.name})`]);
+  const s=sel('o-plan',ops,OPT.plan);box.appendChild(el('label',{for:'o-plan',text:'Plan'}));box.appendChild(s);s.onchange=()=>{OPT.plan=s.value;refresh();};
+  box.appendChild(el('div',{class:'muted',style:'grid-column:1/-1;font-size:.74rem',text:'Any election can be re-tallied on any plan. A district race only covers its own district, so other districts show no votes.'}));}
+// ---------- modes ----------
+let STATEBB=null,STATEMASK=null;
+let BUSY=false,AGAIN=false;
+async function refresh(){if(BUSY){AGAIN=true;return;}BUSY=true;do{AGAIN=false;await run1();}while(AGAIN);BUSY=false;}
+async function run1(){try{LASTPLAN=resolvePlan();await syncCrop();syncCCrop();
+  document.getElementById('cardCty').classList.toggle('hide',MODE==='dist');
+  if(MODE==='map'){document.getElementById('cardOpt').classList.add('hide');await drawElection();}
+  else if(MODE==='cmp')await drawCompare();else await drawDistricts();
+  if(MODE!=='map'&&OPT.ccrop&&LAYERS&&COUNTY[OPT.ccrop]){LAYERS.clip2=COUNTY[OPT.ccrop];fit(COUNTYBB[OPT.ccrop],0.05);draw();document.getElementById('title').textContent+=` — ${titleCase(OPT.ccrop)} County`;}}catch(err){console.error(err);setStatus(err.message||String(err),true);}}
+function ownPlanOf(P){const s=P.s,y=P.sel&&P.sel.e?P.sel.e.year:+s.year;return s.g==='ushouse'?IDX.planyr.ushouse[y]||null:s.g==='leg'?IDX.planyr[s.o][y]||null:null;}
+function ownPlan(){if(PA.s.g==='ushouse'||PA.s.g==='leg'){OPT.ovl='auto';syncOvl();}}
+let LASTPLAN=null; // the plan whose lines are on screen now
+function resolvePlan(){const o=OPT.ovl;if(o!=='auto'&&o!=='none')return o;if(o==='none'&&MODE!=='dist')return null;const own=ownPlanOf(MODE==='cmp'?PB:PA);return own||(MODE==='dist'?'C2026':null);}
+function syncOvl(){const s=document.getElementById('o-ovl');if(s.value!==OPT.ovl)s.value=OPT.ovl;[...s.options].forEach(o=>{if(o.value==='none')o.disabled=MODE==='dist';});if(MODE==='dist'&&OPT.ovl==='none'){OPT.ovl='auto';s.value='auto';}}
+function prevOf(s,sel){if(!sel)return null; // the same race's previous election of the same kind (general, or the same party's primary)
+  const e=sel.e,p=sel.one?sel.one.p:(sel.all?sel.all[0].p:''),d=sel.one&&(s.g==='ushouse'||s.g==='leg'||SUBG(s.g))?sel.one.d:null;const lab=sel.one&&SUBG(s.g)?sel.one.c.lab:null;
+  const same=x=>x.g===s.g&&(s.g!=='cos'&&s.g!=='leg'&&!SUBG(s.g)||x.o===s.o)&&(d===null||x.d===d)&&(lab===null||x.c.lab===lab);
+  let L=CAT.filter(x=>same(x)&&x.year<e.year&&x.kind===e.kind&&x.p===p);
+  if(!L.length)L=CAT.filter(x=>same(x)&&x.year<e.year&&x.kind==='general');
+  if(!L.length)L=CAT.filter(x=>same(x)&&x.e.id!==e.id);
+  if(!L.length)return null;L.sort((a,b)=>b.year-a.year||(a.kind==='general'?-1:1));const x=L[0];
+  return {g:s.g,o:s.o,year:x.year,stage:x.e.id+'|'+x.p,d:d===null?'all':String(d),v:0,lab:x.c.lab};}
+function setMode(m){const prev=MODE;
+  if(m==='cmp'&&prev!=='cmp'){const cur={...PA.s},pv=prevOf(PA.s,PA.sel);Object.assign(PB.s,cur);PB.render();if(pv){Object.assign(PA.s,pv);PA.render();}}
+  if(prev==='cmp'&&m!=='cmp'){Object.assign(PA.s,{...PB.s});PA.render();}
+  MODE=m;if(m==='dist')ownPlan();for(const [id,mm] of [['t-map','map'],['t-cmp','cmp'],['t-dist','dist']])document.getElementById(id).setAttribute('aria-selected',String(mm===m));
+  document.getElementById('cardB').classList.toggle('hide',m!=='cmp');document.getElementById('cardA-h').textContent=m==='cmp'?'From (earlier election)':'Election';
+  PA.opts.noAllPrimary=PB.opts.noAllPrimary=(m!=='map');PA.render();PB.render();refresh();}
+document.getElementById('t-map').onclick=()=>setMode('map');document.getElementById('t-cmp').onclick=()=>setMode('cmp');document.getElementById('t-dist').onclick=()=>setMode('dist');
+(async function init(){
+  resize();
+  try{IDX=await load('index.json');buildCat();for(const p of IDX.plans)Object.assign(p,relabel(p));fillOvl();
+    const cj=await load('geo/counties.json');COUNTY={};let x0=1e12,y0=1e12,x1=-1e12,y1=-1e12;const all=[];
+    for(const k in cj.c){const rings=decodeRings(cj.c[k],cj.q);COUNTY[k]=ringsPath(rings);{let a=1e12,b=1e12,c=-1e12,d=-1e12;for(const r of rings)for(const [x,y] of r){if(x<a)a=x;if(x>c)c=x;if(y<b)b=y;if(y>d)d=y;}COUNTYBB[k]=[a,b,c,d];}for(const r of rings){all.push(r);for(const [x,y] of r){x0=Math.min(x0,x);x1=Math.max(x1,x);y0=Math.min(y0,y);y1=Math.max(y1,y);}}}
+    STATEIN=ringsPath(all);STATEBB=[x0,y0,x1,y1];const m=new Path2D();const pad=4e6;m._rings=[[[x0-pad,y0-pad],[x1+pad,y0-pad],[x1+pad,y1+pad],[x0-pad,y1+pad]]].concat(all);m.moveTo(x0-pad,y0-pad);m.lineTo(x1+pad,y0-pad);m.lineTo(x1+pad,y1+pad);m.lineTo(x0-pad,y1+pad);m.closePath();for(const r of all){r.forEach((pt,i)=>i?m.lineTo(pt[0],pt[1]):m.moveTo(pt[0],pt[1]));m.closePath();}STATEMASK=m;
+  }catch(e){setStatus('Could not load the election data: '+e.message,true);return;}
+  PA=new Picker(document.getElementById('pickA'),'a-',{g:'president',year:2024},refresh);
+  PB=new Picker(document.getElementById('pickB'),'b-',{g:'president',year:2020},refresh);
+  setMode('map');
+})();
+</script>
+
+</body>
+</html>
