@@ -191,7 +191,12 @@ function osmTiles(W,H){ // tiles covering the device-pixel view, each with its a
   return out;}
 function drawTiles(g,tiles,pre){for(const t of tiles){if(!t.im.complete||!t.im.naturalWidth)continue;for(const u of t.sub){const m=u.m;g.save();g.transform(...(pre||[1,0,0,1,0,0]));g.transform(m[0],m[1],m[2],m[3],m[4],m[5]);g.drawImage(t.im,u.sx,u.sy,u.q,u.q,-0.4,-0.4,u.q+0.8,u.q+0.8);g.restore();}}}
 document.getElementById('tg-osm').addEventListener('change',e=>{BASE.on=e.target.checked;document.getElementById('osmattr').classList.toggle('hide',!BASE.on);draw();});
-const PLAN={};let PLACES=null;const CITYP={};
+const PLAN={};let PLACES=null;const CITYP={};const OUTL={};
+// races without their own district lines: an outline around the precincts that voted
+function wantsOutline(c){return (c.g==='courts'&&(c.o==='district'||c.o==='superior'))||(c.g==='local'&&c.o==='cc');}
+async function outlShape(eid,c){if(!(eid in OUTL)){try{OUTL[eid]=await load('outl/'+eid+'.json');}catch(e){OUTL[eid]=null;}}const O=OUTL[eid];if(!O)return null;
+  const enc=O.o[c.id]||O.o[c.id+'|'+(c.lab||'')];if(!enc||!enc.length)return null;const rings=decodeRings(enc,O.q);let a=1e12,b=1e12,cc=-1e12,d=-1e12;for(const r of rings)for(const [x,y] of r){if(x<a)a=x;if(x>cc)cc=x;if(y<b)b=y;if(y>d)d=y;}
+  return {path:ringsPath(rings),bb:[a,b,cc,d]};}
 async function cityShape(name){if(CITYP[name])return CITYP[name];if(!PLACES)PLACES=await load('geo/places.json');const enc=PLACES.c[name];if(!enc)return null;
   const rings=decodeRings(enc,PLACES.q);let a=1e12,b=1e12,c=-1e12,d=-1e12;for(const r of rings)for(const [x,y] of r){if(x<a)a=x;if(x>c)c=x;if(y<b)b=y;if(y>d)d=y;}
   return CITYP[name]={path:ringsPath(rings),bb:[a,b,c,d]};}
@@ -508,6 +513,7 @@ async function drawElection(){
   if(!bb){let x0=1e12,y0=1e12,x1=-1e12,y1=-1e12;for(const k of have){const b=Gs[Math.floor(k/K)].bb[k%K];x0=Math.min(x0,b[0]);y0=Math.min(y0,b[1]);x1=Math.max(x1,b[2]);y1=Math.max(y1,b[3]);}bb=[x0,y0,x1,y1];
     if(!one||!(s.g==='ushouse'||s.g==='leg'||(SUBG(s.g)&&one.o!=='supreme'&&one.o!=='coa')))bb=STATEBB;}
   let cityLine=null;if(one&&one.o==='mayor'){const C=await cityShape(one.d);if(C){clip=C.path;bb=C.bb;cityLine=C.path;}}   // mayoral races: cropped to the city limits
+  if(one&&!cityLine&&wantsOutline(one)&&!(PL&&PL.D[dk(one)])){const O=await outlShape(e.id,one);if(O){clip=O.path;bb=O.bb;cityLine=O.path;}}
   let labels=PL?distLabels(PL,one?[dk(one)]:Object.keys(PL.D)):[];
   {const ov=resolvePlan();if(ov===null){dlines=[];labels=[];}else if(ov!==pid){const OP=await plan(ov);dlines=Object.values(OP.D).map(x=>x.path);labels=distLabels(OP,Object.keys(OP.D));}}
   // ---- crop a statewide race to one district of the chosen lines
