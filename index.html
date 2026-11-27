@@ -302,7 +302,7 @@ for(const k of ['num','dl','cl'])document.getElementById('tg-'+k).addEventListen
 function distLabels(PL,ids,darkOf){return ids.filter(d=>PL.D[d]).map(d=>{const D=PL.D[d];if(!D.lab)D.lab=poleish(D.big);return {x:D.lab[0],y:D.lab[1],t:String(d),dark:darkOf?darkOf(d):false};});}
 // fast interaction: while panning/zooming, redraw a scaled snapshot; the full redraw runs once the gesture pauses
 let SNAP=null,DT=null,RAF=0;
-function snap(){if(!SNAP)SNAP={c:document.createElement('canvas')};SNAP.c.width=cv.width;SNAP.c.height=cv.height;SNAP.c.getContext('2d').drawImage(cv,0,0);SNAP.v={...VIEW};}
+function snap(){if(!cv.width||!cv.height)return;if(!SNAP)SNAP={c:document.createElement('canvas')};SNAP.c.width=cv.width;SNAP.c.height=cv.height;SNAP.c.getContext('2d').drawImage(cv,0,0);SNAP.v={...VIEW};}
 function quick(){RAF=0;if(!SNAP||!SNAP.v||SNAP.c.width!==cv.width){drawFull();return;}const f=VIEW.s/SNAP.v.s;ctx.setTransform(1,0,0,1,0,0);ctx.fillStyle='#ffffff';ctx.fillRect(0,0,cv.width,cv.height);ctx.imageSmoothingEnabled=f<1.5;ctx.setTransform(f,0,0,f,VIEW.tx-SNAP.v.tx*f,VIEW.ty-SNAP.v.ty*f);ctx.drawImage(SNAP.c,0,0);ctx.setTransform(1,0,0,1,0,0);}
 function interact(){if(!RAF)RAF=requestAnimationFrame(quick);clearTimeout(DT);DT=setTimeout(draw,140);}
 function draw(){clearTimeout(DT);if(RAF){cancelAnimationFrame(RAF);RAF=0;}drawFull();snap();}
