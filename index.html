@@ -412,6 +412,7 @@ cv.addEventListener('wheel',e=>{e.preventDefault();const r=cv.getBoundingClientR
 document.getElementById('zin').onclick=()=>zoomAt(1.4,cv.width/2,cv.height/2);
 document.getElementById('zout').onclick=()=>zoomAt(1/1.4,cv.width/2,cv.height/2);
 document.getElementById('zfit').onclick=()=>{if(HOME){VIEW={...HOME};draw();}};
+try{new ResizeObserver(()=>{if(!cv.width&&cv.parentElement.clientWidth){resize();refresh();}}).observe(cv.parentElement);}catch(e){}
 window.addEventListener('resize',()=>{const old=cv.width;resize();if(HOME&&old){const f=cv.width/old;VIEW={s:VIEW.s*f,tx:VIEW.tx*f,ty:VIEW.ty*f};HOME={s:HOME.s*f,tx:HOME.tx*f,ty:HOME.ty*f};}draw();});
 // ---------- helpers ----------
 const fmt=n=>Math.round(n).toLocaleString('en-US');const pct=x=>(x*100).toFixed(1)+'%';
