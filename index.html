@@ -276,7 +276,7 @@ function shapeParty(contests){const M=new Map();for(const c of contests){const n
 const cv=document.getElementById('map'),ctx=cv.getContext('2d');
 let VIEW={tx:0,ty:0,s:1},LAYERS=null,HOME=null;
 function resize(){const r=cv.parentElement.getBoundingClientRect(),dpr=window.devicePixelRatio||1;cv.width=Math.round(r.width*dpr);cv.height=Math.round(r.height*dpr);}
-function fit(bb,pad=0.04){const W=cv.width,H=cv.height,w=bb[2]-bb[0],h=bb[3]-bb[1];const s=Math.min(W*(1-2*pad)/w,H*(1-2*pad)/h);VIEW={s,tx:W/2-(bb[0]+bb[2])/2*s,ty:H/2+(bb[1]+bb[3])/2*s};HOME={...VIEW};}
+function fit(bb,pad=0.04){if(!cv.width||!cv.height)resize();const W=cv.width,H=cv.height,w=bb[2]-bb[0],h=bb[3]-bb[1];const s=Math.min(W*(1-2*pad)/w,H*(1-2*pad)/h);VIEW={s,tx:W/2-(bb[0]+bb[2])/2*s,ty:H/2+(bb[1]+bb[3])/2*s};HOME={...VIEW};}
 function setT(){ctx.setTransform(VIEW.s,0,0,-VIEW.s,VIEW.tx,VIEW.ty);}
 const patCache={};
 function hatch(color){if(patCache[color])return patCache[color];const c=document.createElement('canvas');c.width=c.height=10;const g=c.getContext('2d');g.fillStyle='#ffffff';g.fillRect(0,0,10,10);g.globalAlpha=.55;g.fillStyle=color;g.fillRect(0,0,10,10);g.globalAlpha=1;g.strokeStyle=color;g.lineWidth=2.4;g.beginPath();g.moveTo(-2,12);g.lineTo(12,-2);g.moveTo(-2,2);g.lineTo(2,-2);g.moveTo(8,12);g.lineTo(12,8);g.stroke();patCache[color]=ctx.createPattern(c,'repeat');return patCache[color];}
@@ -412,7 +412,7 @@ cv.addEventListener('wheel',e=>{e.preventDefault();const r=cv.getBoundingClientR
 document.getElementById('zin').onclick=()=>zoomAt(1.4,cv.width/2,cv.height/2);
 document.getElementById('zout').onclick=()=>zoomAt(1/1.4,cv.width/2,cv.height/2);
 document.getElementById('zfit').onclick=()=>{if(HOME){VIEW={...HOME};draw();}};
-try{new ResizeObserver(()=>{if(!cv.width&&cv.parentElement.clientWidth){resize();refresh();}}).observe(cv.parentElement);}catch(e){}
+try{new ResizeObserver(()=>{if((!cv.width||!(VIEW.s>0))&&cv.parentElement.clientWidth&&cv.parentElement.clientHeight){resize();refresh();}}).observe(cv.parentElement);}catch(e){}
 window.addEventListener('resize',()=>{const old=cv.width;resize();if(HOME&&old){const f=cv.width/old;VIEW={s:VIEW.s*f,tx:VIEW.tx*f,ty:VIEW.ty*f};HOME={s:HOME.s*f,tx:HOME.tx*f,ty:HOME.ty*f};}draw();});
 // ---------- helpers ----------
 const fmt=n=>Math.round(n).toLocaleString('en-US');const pct=x=>(x*100).toFixed(1)+'%';
