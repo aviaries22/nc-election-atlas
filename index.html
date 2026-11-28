@@ -262,7 +262,7 @@ class Picker{
     this.sel=(s.d==='all'&&(s.g==='ushouse'||s.g==='leg'))?{e:R[0].e,all:R}:{e:R[Math.min(s.v,R.length-1)].e,one:R[Math.min(s.v,R.length-1)]};
   }
   fix(){ // switching to a districted election shows its own district lines; otherwise the lines on screen are kept
-    const lead=this===PA||(MODE==='cmp'&&this===PB);
+    const lead=this===PA||(CMPON()&&this===PB);
     if(lead&&OPT.ovl==='auto'&&LASTPLAN){OPT.ovl=LASTPLAN;}
     this.render();
     if(lead){const own=ownPlanOf(this);if(own)OPT.ovl=own;syncOvl();}
@@ -289,7 +289,7 @@ function setT(){ctx.setTransform(VIEW.s,0,0,-VIEW.s,VIEW.tx,VIEW.ty);}
 const patCache={};
 function hatch(color){if(patCache[color])return patCache[color];const c=document.createElement('canvas');c.width=c.height=10;const g=c.getContext('2d');g.fillStyle='#ffffff';g.fillRect(0,0,10,10);g.globalAlpha=.55;g.fillStyle=color;g.fillRect(0,0,10,10);g.globalAlpha=1;g.strokeStyle=color;g.lineWidth=2.4;g.beginPath();g.moveTo(-2,12);g.lineTo(12,-2);g.moveTo(-2,2);g.lineTo(2,-2);g.moveTo(8,12);g.lineTo(12,8);g.stroke();patCache[color]=ctx.createPattern(c,'repeat');return patCache[color];}
 const SHOW={num:true,dl:true,cl:true};
-function syncToggles(){syncOvl();{const lv=document.getElementById('tg-lvl');const lok=(MODE==='map'&&!(LAYERS&&LAYERS.noCounty))||MODE==='cmp';lv.disabled=!lok;document.getElementById('lb-lv').classList.toggle('off',!lok);}{const sh=document.getElementById('tg-shade');sh.disabled=MODE==='cmp';document.getElementById('lb-sh').classList.toggle('off',MODE==='cmp');}const L=LAYERS||{};const hasD=!!(L.dlines&&L.dlines.length),hasN=!!(L.labels&&L.labels.length);
+function syncToggles(){syncOvl();{const lv=document.getElementById('tg-lvl');const lok=(MODE==='map'&&!(LAYERS&&LAYERS.noCounty))||MODE==='cmp';lv.disabled=!lok;document.getElementById('lb-lv').classList.toggle('off',!lok);}{const sh=document.getElementById('tg-shade');sh.disabled=CMPON();document.getElementById('lb-sh').classList.toggle('off',CMPON());}const L=LAYERS||{};const hasD=!!(L.dlines&&L.dlines.length),hasN=!!(L.labels&&L.labels.length);
   for(const [id,ok] of [['num',hasN],['dl',hasD]]){const i=document.getElementById('tg-'+id);i.disabled=!ok;document.getElementById('lb-'+id).classList.toggle('off',!ok);}}
 function fillOvl(){const ch={congress:'Congress',senate:'State Senate',house:'State House',district:'District Court',superior:'Superior Court'};const s=document.getElementById('o-ovl');s.innerHTML='';
   const ops=[['auto','The election’s own'],['none','None']].concat(IDX.plans.slice().sort((a,b)=>a.chamber.localeCompare(b.chamber)||b.id.localeCompare(a.id)).map(p=>[p.id,`${ch[p.chamber]} ${p.yrs} (${p.name})`]));
@@ -437,7 +437,7 @@ function nearestFill(G,want,haveKeys,colorOf,setIdx,restrictCty){
   const out=[];for(const i of want){const L=byC[G.cty[i]];if(!L||(restrictCty&&!restrictCty.has(G.cty[i])))continue;let best=null,bd=1e30;const c=G.cen[i];for(const k of L){const d=G.cen[k%K];const dd=(d[0]-c[0])**2+(d[1]-c[1])**2;if(dd<bd){bd=dd;best=k;}}if(best!==null)out.push([i,best]);}
   return out;}
 function legendBlock(title,items){const d=el('div',{class:'lg'});d.appendChild(el('h3',{text:title}));for(const [c,l,h] of items){const s=el('div',{class:'sw'});const i=el('i');i.dataset.c=c||'';if(h)i.dataset.h=h;if(h){i.style.background=`repeating-linear-gradient(135deg,${h} 0 2px,#fff 2px 5px)`;}else i.style.background=c;s.appendChild(i);s.appendChild(el('span',{text:l}));d.appendChild(s);}return d;}
-function setHead(t,s){if(SHADE==='margin'&&MODE!=='cmp'&&s)s=s.replace(/its share of registered voters/,'its lead over the next-largest group').replace(/winner’s share of the vote/g,'winner’s margin over the runner-up').replace(/leader’s share of the vote/g,'leader’s margin over the runner-up').replace(/leader’s share/g,'leader’s margin');document.getElementById('title').textContent=t;document.getElementById('subtitle').textContent=s||'';}
+function setHead(t,s){if(SHADE==='margin'&&!CMPON()&&s)s=s.replace(/its share of registered voters/,'its lead over the next-largest group').replace(/winner’s share of the vote/g,'winner’s margin over the runner-up').replace(/leader’s share of the vote/g,'leader’s margin over the runner-up').replace(/leader’s share/g,'leader’s margin');document.getElementById('title').textContent=t;document.getElementById('subtitle').textContent=s||'';}
 function setNote(t){document.getElementById('note').textContent=t;}
 function planFor(sel){return pidOf(sel.g,sel.o,sel.year);}
 const LINES_NOTE=sets=>sets[0]==='cty'?'Shown by county':sets[0]==='2006'?'Drawn on the 2006 precinct lines, with 2012 lines for precincts created later':'Drawn on the '+(sets[0]==='2018'?'2017':sets[0])+' precinct lines';
@@ -448,7 +448,7 @@ function poolNote(e){const nr=' Precinct shapes with no results are colored like
   return POOL_NOTE;}
 const POOL_NOTE='Early, absentee and provisional votes not reported by precinct are assigned to precincts within the county, 60% by each candidate’s election-day precinct share and 40% by party registration, with precinct totals scaled to registration (2000: election-day share only). Precinct shapes with no results are colored like the nearest precinct in the same county; they add no votes.';
 // ---------- MODE 1: election map ----------
-let MODE='map',PA,PB,OPT={ovl:'auto',crop:'',ccrop:'',bins:'narrow',metric:'auto',ca:0,cb:0,plan:'C2026',trend:'swing'};
+let MODE='map',PA,PB,OPT={dcmp:false,ovl:'auto',crop:'',ccrop:'',bins:'narrow',metric:'auto',ca:0,cb:0,plan:'C2026',trend:'swing'};
 async function drawElection(){
   const P=PA,sx=P.sel,s=P.s;setStatus('Loading…');
   const contests=await getContests(sx);const e=sx.e;const sets=e.sets;const Gs=await Promise.all(sets.map(geo));
@@ -696,9 +696,54 @@ function renderCompareOpts(mode,ca,cb){
   if(mode==='share')box.appendChild(el('div',{class:'muted',style:'grid-column:1/-1;font-size:.74rem',text:(ca[0].g==='reg'||cb[0].g==='reg')&&(ca[0].o==='race'||cb[0].o==='race')?'Race comparisons show one group’s share of registered voters in each. Non-white is every group except White and Undesignated.':'A primary is involved, so the map compares one candidate’s share in each election.'}));
 }
 // ---------- MODE 3: on district lines ----------
+function renderDistOpts(mode,ca,cb){ // options card on the district-lines page: compare switch (+ comparison options when on)
+  const box=document.getElementById('opts');box.innerHTML='';document.getElementById('cardOpt').classList.remove('hide');document.getElementById('opt-h').textContent=OPT.dcmp?'Comparison options':'Options';
+  const add=(lab,node)=>{box.appendChild(el('label',{for:node.id,text:lab}));box.appendChild(node);};
+  const c=sel('o-dcmp',[['0','Off'],['1','Compare two elections']],OPT.dcmp?'1':'0');add('Compare',c);c.onchange=()=>setMode('dist',c.value==='1');
+  if(!OPT.dcmp)return;
+  if(mode==='share'&&!OPT.picked){OPT.ca=0;const nm=ca[0].c[0];let j=cb[0].c.indexOf(nm);if(j<0){const pa=ca[0].p||ca[0].cp[0]||'';j=cb[0].cp.findIndex(p=>(p||'').toUpperCase()===pa.toUpperCase());}OPT.cb=Math.max(0,j);}
+  if(mode==='share'){if(OPT.ca>=ca[0].c.length||(OPT.ca<0&&ca[0].o!=='race'))OPT.ca=0;if(OPT.cb>=cb[0].c.length||(OPT.cb<0&&cb[0].o!=='race'))OPT.cb=0;const opt=x=>x.c.map((n,i)=>[i,n]).concat(x.g==='reg'&&x.o==='race'&&x.c.length>2?[[-1,'Non-white']]:[]);const a=sel('o-ca',opt(ca[0]),OPT.ca),b=sel('o-cb',opt(cb[0]),OPT.cb);add(ca[0].g==='reg'?'Group A':'Candidate A',a);add(cb[0].g==='reg'?'Group B':'Candidate B',b);a.onchange=()=>{OPT.ca=+a.value;OPT.picked=true;refresh();};b.onchange=()=>{OPT.cb=+b.value;OPT.picked=true;refresh();};}
+  const t=sel('o-tr',[['swing','Change'],['trend','Change relative to overall']],OPT.trend);add('Show',t);t.onchange=()=>{OPT.trend=t.value;refresh();};
+  const bn=sel('o-bins',[['narrow','2.5 to 20 points'],['wide','5 to 40 points']],OPT.bins);add('Buckets',bn);bn.onchange=()=>{OPT.bins=bn.value;refresh();};}
+async function distTally(sel_,mode,ci,PL){ // per district {D,R,T} (margin) or {X,T} (share), re-tallied geographically onto the plan
+  const r=await perShape(sel_,mode,ci);const M26=await to2026({sets:sel_.e.sets,M:r.M});const DV={};
+  for(const [j,v] of M26){const as=PL.a26[j];if(!as)continue;for(const [d,w] of as){const o=DV[d]||(DV[d]={});for(const f in v)o[f]=(o[f]||0)+v[f]*w;}}return DV;}
+async function drawDistCompare(){
+  const A=PA.sel,B=PB.sel;setStatus('Loading…');syncOvl();
+  const mode=(canMargin(A)&&canMargin(B))?'margin':'share';
+  const [ca,cb]=await Promise.all([getContests(A),getContests(B)]);renderDistOpts(mode,ca,cb);
+  const PL=await plan(resolvePlan());
+  const [DA,DB]=await Promise.all([distTally(A,mode,OPT.ca,PL),distTally(B,mode,OPT.cb,PL)]);
+  const val=v=>mode==='margin'?(v.D-v.R)/v.T*100:v.X/v.T*100;
+  const ds=Object.keys(PL.D).filter(d=>DA[d]&&DB[d]&&DA[d].T>0.5&&DB[d].T>0.5);
+  const sum=(DV)=>{const s={D:0,R:0,X:0,T:0};for(const d of ds)for(const f in DV[d])s[f]+=DV[d][f];return s;};
+  const OA=ds.length?val(sum(DA)):0,OB=ds.length?val(sum(DB)):0,dO=OB-OA,trend=OPT.trend==='trend';
+  const EDG=OPT.bins==='wide'?[5,10,20,30,40]:[2.5,5,10,15,20];const LB=[`Under ${EDG[0]}`].concat(EDG.slice(0,-1).map((e,i)=>`${e}–${EDG[i+1]}`),[`${EDG[4]}+`]);
+  const sameYear=A.e.year===B.e.year;const pal=mode==='share'?DIV.TO:sameYear?DIV.PG:DIV.BR;
+  const nA=labelOf(PA),nB=labelOf(PB);const f=x=>mode==='margin'?mg(x):x.toFixed(1)+'%';
+  const fills=[],hits=[],labels=[],used=new Set(),rows=[];let missing=false;
+  for(const d in PL.D){const D=PL.D[d];let col=NODATA,dark=false,r=null;
+    if(ds.includes(d)){const va=val(DA[d]),vb=val(DB[d]);let x=vb-va;if(trend)x-=dO;const b=EDG.filter(e=>Math.abs(x)>=e).length;col=Math.abs(x)<1e-9?NOTE_GRAY:(x>0?pal.pos:pal.neg)[b];dark=b>=4;used.add((x>0?'p':'n')+b);r={d,va,vb,x};rows.push(r);}else missing=true;
+    fills.push({p:D.path,f:col,stroke:'#000'});
+    hits.push({p:D.path,bb:D.bb,html:()=>r?`<b>District ${esc(d)}</b><table><tr><td>${esc(nA)}</td><td class="n">${f(r.va)}</td></tr><tr><td>${esc(nB)}</td><td class="n">${f(r.vb)}</td></tr><tr><td>${trend?'Change vs. overall':'Change'}</td><td class="n"><b>${(r.x>=0?'+':'')+r.x.toFixed(1)}</b></td></tr></table>`:`<b>District ${esc(d)}</b><div class="muted">Not covered by both elections</div>`});
+    if(!D.lab)D.lab=poleish(D.big);labels.push({x:D.lab[0],y:D.lab[1],t:d,dark});}
+  LAYERS={fills,hits,labels,dlines:Object.values(PL.D).map(x=>x.path),dw:1.1,counties:countyPaths(),mask:STATEMASK};fit(STATEBB,0.02);draw();
+  const lg=document.getElementById('legend');lg.innerHTML='';
+  const posL=mode==='share'?`Higher in ${nB}`:sameYear?`More Democratic in ${nB}`:(trend?'More Democratic than overall':'Toward Democrats');
+  const negL=mode==='share'?`Lower in ${nB}`:sameYear?`More Republican in ${nB}`:(trend?'More Republican than overall':'Toward Republicans');
+  for(const [sg,nm,arr] of [['p',posL,pal.pos],['n',negL,pal.neg]]){const it=[];for(let b=5;b>=0;b--)if(used.has(sg+b))it.push([arr[b],LB[b]+' pts']);if(it.length)lg.appendChild(legendBlock(nm,it));}
+  if(missing)lg.appendChild(legendBlock('Other',[[NODATA,'Not covered by both elections']]));
+  const chn=({house:'state house',senate:'state senate',congress:'congressional',district:'district court',superior:'superior court'})[PL.chamber];
+  setHead(`${nA} → ${nB} on the ${PL.yrs} ${chn} districts`,(mode==='margin'?'Change in Democratic margin':'Change in vote share')+(trend?', relative to the change across the compared districts':'')+', by district.');
+  setNote('Both elections are spread onto 2020 census blocks by voting-age population and re-added into each district (via the 2026 precinct lines); each block goes to the district containing its interior point. Only districts with votes in both elections are compared. '+(sameYear&&mode==='margin'?'Same-year comparison: purple/green. ':'')+POOL_NOTE.split('. ')[0]+'.');
+  const box=document.getElementById('results');box.innerHTML='';document.getElementById('res-h').textContent='Districts';
+  box.appendChild(el('div',{class:'muted',style:'font-size:.78rem;margin-bottom:6px',html:`Compared districts: <b>${f(OA)}</b> → <b>${f(OB)}</b> (${(dO>=0?'+':'')+dO.toFixed(1)} pts)`}));
+  const tb=el('table',{class:'res'});tb.innerHTML=`<tr><th>Dist.</th><th class="n">From</th><th class="n">To</th><th class="n">${trend?'vs. overall':'Change'}</th></tr>`;
+  rows.sort((a,b)=>natCmp(a.d,b.d)).forEach(r=>{const tr=el('tr');tr.innerHTML=`<td>${esc(r.d)}</td><td class="n">${f(r.va)}</td><td class="n">${f(r.vb)}</td><td class="n">${(r.x>=0?'+':'')+r.x.toFixed(1)}</td>`;tb.appendChild(tr);});box.appendChild(tb);
+  setStatus('');}
 async function drawDistricts(){
   const A=PA.sel;setStatus('Loading…');
-  document.getElementById('cardOpt').classList.add('hide');syncOvl();
+  renderDistOpts();syncOvl();
   const PL=await plan(resolvePlan());const contests=await getContests(A);const isGen=genLike(A.e,contests[0]);
   // per shape vector of candidate (or party) votes
   const groups=isGen?['D','R','O']:contests[0].c.map((n,i)=>i);
@@ -747,12 +792,12 @@ async function refresh(){if(BUSY){AGAIN=true;return;}BUSY=true;do{AGAIN=false;aw
 async function run1(){try{LASTPLAN=resolvePlan();await syncCrop();syncCCrop();
   document.getElementById('cardCty').classList.toggle('hide',MODE==='dist');
   if(MODE==='map'){document.getElementById('cardOpt').classList.add('hide');await drawElection();}
-  else if(MODE==='cmp')await drawCompare();else await drawDistricts();
+  else if(MODE==='cmp')await drawCompare();else if(OPT.dcmp)await drawDistCompare();else await drawDistricts();
   if(MODE!=='map'&&OPT.ccrop&&LAYERS&&COUNTY[OPT.ccrop]){LAYERS.clip2=COUNTY[OPT.ccrop];fit(COUNTYBB[OPT.ccrop],0.05);draw();document.getElementById('title').textContent+=` — ${titleCase(OPT.ccrop)} County`;}}catch(err){console.error(err);setStatus(err.message||String(err),true);}}
 function ownPlanOf(P){const s=P.s,y=P.sel&&P.sel.e?P.sel.e.year:+s.year;return pidOf(s.g,s.o,y);}
 function ownPlan(){if(hasPlan(PA.s.g,PA.s.o)){OPT.ovl='auto';syncOvl();}}
 let LASTPLAN=null; // the plan whose lines are on screen now
-function resolvePlan(){const o=OPT.ovl;if(o!=='auto'&&o!=='none')return o;if(o==='none'&&MODE!=='dist')return null;const own=ownPlanOf(MODE==='cmp'?PB:PA);return own||(MODE==='dist'?'C2026':null);}
+function resolvePlan(){const o=OPT.ovl;if(o!=='auto'&&o!=='none')return o;if(o==='none'&&MODE!=='dist')return null;const own=ownPlanOf(CMPON()?PB:PA);return own||(MODE==='dist'?'C2026':null);}
 function syncOvl(){const s=document.getElementById('o-ovl');if(s.value!==OPT.ovl)s.value=OPT.ovl;[...s.options].forEach(o=>{if(o.value==='none')o.disabled=MODE==='dist';});if(MODE==='dist'&&OPT.ovl==='none'){OPT.ovl='auto';s.value='auto';}}
 function prevOf(s,sel){if(!sel)return null; // the same race's previous election of the same kind (general, or the same party's primary)
   const e=sel.e,p=sel.one?sel.one.p:(sel.all?sel.all[0].p:''),d=sel.one&&(s.g==='ushouse'||s.g==='leg'||SUBG(s.g))?sel.one.d:null;const lab=sel.one&&SUBG(s.g)?sel.one.c.lab:null;
@@ -762,11 +807,12 @@ function prevOf(s,sel){if(!sel)return null; // the same race's previous election
   if(!L.length)L=CAT.filter(x=>same(x)&&x.e.id!==e.id);
   if(!L.length)return null;L.sort((a,b)=>b.year-a.year||(a.kind==='general'?-1:1));const x=L[0];
   return {g:s.g,o:s.o,year:x.year,stage:x.e.id+'|'+x.p,d:d===null?'all':String(d),v:0,lab:x.c.lab};}
-function setMode(m){const prev=MODE;
-  if(m==='cmp'&&prev!=='cmp'){const cur={...PA.s},pv=prevOf(PA.s,PA.sel);Object.assign(PB.s,cur);PB.render();if(pv){Object.assign(PA.s,pv);PA.render();}}
-  if(prev==='cmp'&&m!=='cmp'){Object.assign(PA.s,{...PB.s});PA.render();}
-  MODE=m;if(m==='dist')ownPlan();for(const [id,mm] of [['t-map','map'],['t-cmp','cmp'],['t-dist','dist']])document.getElementById(id).setAttribute('aria-selected',String(mm===m));
-  document.getElementById('cardB').classList.toggle('hide',m!=='cmp');document.getElementById('cardA-h').textContent=m==='cmp'?'From (earlier election)':'Election';
+function CMPON(){return MODE==='cmp'||(MODE==='dist'&&OPT.dcmp);}
+function setMode(m,dcmp=OPT.dcmp){const prev=MODE,pc=CMPON();const nc=m==='cmp'||(m==='dist'&&dcmp);
+  if(nc&&!pc){const cur={...PA.s},pv=prevOf(PA.s,PA.sel);Object.assign(PB.s,cur);PB.render();if(pv){Object.assign(PA.s,pv);PA.render();}}
+  if(pc&&!nc){Object.assign(PA.s,{...PB.s});PA.render();}
+  OPT.dcmp=dcmp;MODE=m;if(m==='dist')ownPlan();for(const [id,mm] of [['t-map','map'],['t-cmp','cmp'],['t-dist','dist']])document.getElementById(id).setAttribute('aria-selected',String(mm===m));
+  document.getElementById('cardB').classList.toggle('hide',!nc);document.getElementById('cardA-h').textContent=nc?'From (earlier election)':'Election';
   PA.opts.noAllPrimary=PB.opts.noAllPrimary=(m!=='map');PA.render();PB.render();refresh();}
 document.getElementById('t-map').onclick=()=>setMode('map');document.getElementById('t-cmp').onclick=()=>setMode('cmp');document.getElementById('t-dist').onclick=()=>setMode('dist');
 (async function init(){
