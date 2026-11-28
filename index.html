@@ -214,9 +214,9 @@ const XW={};async function xw(set){if(set==='2026')return null;if(!XW[set])XW[se
 // ---------- catalog / picker ----------
 let CAT=[];
 function buildCat(){CAT=[];for(const e of IDX.elections)e.contests.forEach((c,i)=>CAT.push({e,i,c,g:c.g,o:c.o,d:c.d,p:c.p||'',year:e.year,kind:e.kind}));}
-function stageLabel(e,p){if(e.kind==='registration')return 'As of '+e.date;if(e.kind==='general')return 'General, '+e.date;
-  if(e.kind==='municipal')return (p?(PARTYNAME[p]||p)+' municipal primary':'Municipal election')+', '+e.date;const pn=p?(PARTYNAME[p]||p):'Nonpartisan';return pn+' '+KINDN[e.kind]+', '+e.date;}
-function stageText(e,p){if(e.kind==='general')return `${e.year} general election`;if(e.kind==='municipal')return p?`${e.year} ${PARTYNAME[p]||p} municipal primary (${e.date})`:`${e.date} municipal election`;return `${e.year} ${p?(PARTYNAME[p]||p):'nonpartisan'} ${KINDN[e.kind]}`;}
+function stageLabel(e,p){const sp=e.id[0]==='s'?'special ':'';if(e.kind==='registration')return 'As of '+e.date;if(e.kind==='general')return (sp?'Special general':'General')+', '+e.date;
+  if(e.kind==='municipal')return (p?(PARTYNAME[p]||p)+' municipal primary':'Municipal election')+', '+e.date;const pn=p?(PARTYNAME[p]||p):'Nonpartisan';return pn+' '+sp+KINDN[e.kind]+', '+e.date;}
+function stageText(e,p){const sp=e.id[0]==='s'?'special ':'';if(e.kind==='general')return `${e.year} ${sp}general election`;if(e.kind==='municipal')return p?`${e.year} ${PARTYNAME[p]||p} municipal primary (${e.date})`:`${e.date} municipal election`;return `${e.year} ${p?(PARTYNAME[p]||p):'nonpartisan'} ${sp}${KINDN[e.kind]}`;}
 const natCmp=(a,b)=>String(a).localeCompare(String(b),'en',{numeric:true});
 function placeLabel(o,d){return o==='superior'||o==='district'?d:o==='mayor'?d:d+' County';}
 function raceLab(c){let n=c.lab||(c.o==='cc'?'Countywide':'Regular term');if(c.note==='unexpired')n+=' (unexpired)';return n;}
